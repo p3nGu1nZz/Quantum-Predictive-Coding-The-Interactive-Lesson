@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
+import { SymbolTable } from './components/SymbolTable';
 import { Particle, Interaction, Vector2 } from './types';
 import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
 import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus } from 'lucide-react';
@@ -54,12 +55,8 @@ export default function App() {
   }, []);
 
   const handleUpdate = (newParticles: Particle[], interactions: Interaction[], energy: { pred: number, pos: number }) => {
-    // CRITICAL FIX: Only update the ref if we are not in the middle of a user-triggered update
-    // OR if the simulation state has caught up to the application state (counts match).
-    // This prevents the physics loop from overwriting the ref with stale data immediately after an Add/Remove action.
     if (!isUpdatingRef.current || newParticles.length === particles.length) {
         latestParticlesRef.current = newParticles;
-        // If counts match, the race is over, we can unlock updates
         if (newParticles.length === particles.length) {
             isUpdatingRef.current = false;
         }
@@ -85,9 +82,7 @@ export default function App() {
   };
 
   const addParticle = () => {
-    // Lock updates to prevent race condition
     isUpdatingRef.current = true;
-    
     const currentList = latestParticlesRef.current;
     const newParticle: Particle = {
         id: currentList.length > 0 ? Math.max(...currentList.map(p => p.id)) + 1 : 0,
@@ -101,10 +96,8 @@ export default function App() {
         color: COLORS.blue,
         isFixed: false
     };
-    
     const newList = [...currentList, newParticle];
     setParticles(newList);
-    // Optimistically update ref so next click sees the new particle even if frame hasn't processed
     latestParticlesRef.current = newList; 
   };
 
@@ -127,11 +120,11 @@ export default function App() {
   // --- Splash Screen ---
   if (!hasStarted) {
     return (
-      <div className="relative w-full h-screen bg-slate-900 overflow-hidden flex flex-col items-center justify-center font-serif">
-         <div className="absolute inset-0 opacity-40 pointer-events-none">
+      <div className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center font-serif">
+         <div className="absolute inset-0 opacity-30 pointer-events-none">
              <SimulationCanvas
                 particles={createParticles('swarm')} 
-                config={{k: 0.05, r0:100, eta:0.1, eta_r:0.1, sigma:100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, damping: 0.98, temperature: 0.3}}
+                config={{k: 0.05, r0:100, eta:0.1, eta_r:0.1, sigma:100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, damping: 0.99, temperature: 0.6}}
                 onUpdate={() => {}}
                 onSelectParticle={() => {}}
                 isRunning={true}
@@ -142,27 +135,27 @@ export default function App() {
              />
          </div>
 
-         <div className="z-10 text-center max-w-3xl px-6 animate-fade-in-up">
-            <div className="flex justify-center mb-6">
-                <Sparkles className="text-cyan-400 w-16 h-16 animate-pulse" />
+         <div className="z-10 text-center max-w-4xl px-6 animate-fade-in-up">
+            <div className="flex justify-center mb-8">
+                <Sparkles className="text-cyan-400 w-24 h-24 animate-pulse neon-text" />
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 mb-6 tracking-tight filter drop-shadow-lg">
-              Quantum PCN
+            <h1 className="text-6xl md:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 mb-8 tracking-tighter filter drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] cyber-font">
+              QUANTUM PCN
             </h1>
-            <p className="text-xl md:text-2xl text-slate-300 mb-8 leading-relaxed font-light">
-               Explore <strong>L-Group PCNs</strong> with vibrationally coupled particles.
+            <p className="text-2xl md:text-3xl text-slate-300 mb-12 leading-relaxed font-light tracking-wide">
+               L-Group Predictive Coding Networks & Vibrational Coupling
             </p>
             
             <button
                onClick={() => setHasStarted(true)}
-               className="group relative px-10 py-5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-lg rounded-full transition-all shadow-[0_0_20px_rgba(8,145,178,0.5)] hover:shadow-[0_0_40px_rgba(8,145,178,0.7)] hover:-translate-y-1 flex items-center gap-3 mx-auto border border-cyan-400"
+               className="group relative px-12 py-6 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-100 font-bold text-xl rounded-none border-2 border-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] hover:-translate-y-1 flex items-center gap-4 mx-auto cyber-font uppercase tracking-widest"
             >
-               <span>Start Interactive Lesson</span>
+               <span>Initialize System</span>
                <ChevronRight className="group-hover:translate-x-1 transition-transform" />
             </button>
             
-            <div className="mt-12 text-slate-500 text-sm">
-                Based on the research of Rawson (2025)
+            <div className="mt-16 text-slate-500 text-sm font-mono tracking-widest">
+                ARCHITECT: K. RAWSON (2025) // SYSTEM READY
             </div>
          </div>
       </div>
@@ -171,72 +164,76 @@ export default function App() {
 
   // --- Main Application ---
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden text-slate-800">
+    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden text-slate-200 bg-black">
       
       {/* Sidebar / Lesson Control */}
-      <div className="w-full md:w-2/5 flex flex-col border-r border-slate-300 bg-slate-50 z-10 shadow-xl">
-        <div className="p-6 border-b border-slate-200 bg-white">
-          <div className="flex items-center gap-2 mb-2">
-             <button onClick={() => setHasStarted(false)} className="hover:text-cyan-600 transition-colors" title="Back to Title">
-                <Sparkles size={24} className="text-cyan-600" />
+      <div className="w-full md:w-2/5 flex flex-col border-r border-slate-800 bg-[#080808] z-10 shadow-2xl relative">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] pointer-events-none"></div>
+
+        <div className="p-8 border-b border-slate-800 bg-black/50 backdrop-blur-sm">
+          <div className="flex items-center gap-3 mb-2">
+             <button onClick={() => setHasStarted(false)} className="hover:text-cyan-400 transition-colors" title="Back to Title">
+                <Sparkles size={28} className="text-cyan-500 neon-text" />
              </button>
-             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-blue-600 font-serif">
-                Quantum PCN
+             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 cyber-font tracking-tight">
+                QUANTUM PCN
              </h1>
           </div>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Interactive Lesson Plan</h2>
+          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] cyber-font pl-10">Interactive Learning Module</h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 relative">
+        <div className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber">
            
-           <h3 className="text-2xl md:text-3xl font-bold text-slate-800 font-serif leading-tight border-b-2 border-cyan-100 pb-2">
+           <h3 className="text-3xl md:text-4xl font-bold text-slate-100 cyber-font leading-tight border-b-2 border-cyan-900/50 pb-4">
             {currentStep.title}
            </h3>
            
-           <div className="text-slate-700 text-sm md:text-base leading-7 md:leading-8 font-normal font-serif">
+           <div className="text-slate-200 text-xl md:text-2xl leading-relaxed font-normal tracking-wide">
              {currentStep.content}
            </div>
 
-           <div className="pt-6 mt-4 border-t border-slate-200">
+           {/* NEW: Symbol Table Component */}
+           <SymbolTable symbols={currentStep.symbols} />
+
+           <div className="pt-8 mt-8 border-t border-slate-800">
              <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
                   disabled={stepIndex === 0}
-                  className="px-5 py-3 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-2 text-sm"
+                  className="px-6 py-4 rounded border border-slate-700 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-3 text-sm uppercase tracking-wider cyber-font"
                 >
-                  <ChevronLeft size={18} /> Back
+                  <ChevronLeft size={18} /> Prev
                 </button>
 
                 <button 
                   onClick={() => setStepIndex(Math.min(LESSON_STEPS.length - 1, stepIndex + 1))}
                   disabled={stepIndex === LESSON_STEPS.length - 1}
-                  className="flex-1 px-5 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-base"
+                  className="flex-1 px-6 py-4 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-wider cyber-font"
                 >
-                  {stepIndex === LESSON_STEPS.length - 1 ? 'Finish Lesson' : 'Next Lesson'} <ChevronRight size={20} />
+                  {stepIndex === LESSON_STEPS.length - 1 ? 'Finish' : 'Next Step'} <ChevronRight size={20} />
                 </button>
              </div>
-             <div className="text-center mt-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Section {stepIndex + 1} of {LESSON_STEPS.length}
+             <div className="text-center mt-4 text-xs font-bold text-slate-600 uppercase tracking-[0.2em] font-mono">
+                Segment {stepIndex + 1} / {LESSON_STEPS.length}
              </div>
            </div>
 
            {/* Real-time Energy Chart */}
            {stepIndex > 1 && (
-             <div className="mt-8 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-               <div className="flex items-center gap-2 mb-2 text-xs text-yellow-600 font-bold uppercase tracking-wider">
-                 <Activity size={14} /> Total Free Energy (F)
+             <div className="mt-10 p-5 bg-black/40 rounded border border-slate-800 shadow-inner">
+               <div className="flex items-center gap-2 mb-3 text-xs text-yellow-500 font-bold uppercase tracking-wider cyber-font">
+                 <Activity size={14} /> System Free Energy
                </div>
-               <div className="h-32 w-full rounded p-1">
+               <div className="h-40 w-full rounded p-1 border border-slate-800/50 bg-black/20">
                  <ResponsiveContainer width="100%" height="100%">
                    <LineChart data={energyData}>
                      <YAxis hide domain={['auto', 'auto']} />
                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', color: '#0f172a', borderRadius: '6px' }}
-                        itemStyle={{ color: '#ca8a04', fontSize: '12px', fontWeight: 'bold' }}
-                        formatter={(val: number) => [val.toFixed(2), "Energy"]}
+                        contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }}
+                        itemStyle={{ color: '#facc15', fontSize: '12px', fontFamily: 'monospace' }}
                         labelStyle={{ display: 'none' }}
                      />
-                     <Line type="monotone" dataKey="E" stroke="#eab308" strokeWidth={2} dot={false} isAnimationActive={false} />
+                     <Line type="monotone" dataKey="E" stroke="#facc15" strokeWidth={2} dot={false} isAnimationActive={false} />
                    </LineChart>
                  </ResponsiveContainer>
                </div>
@@ -244,14 +241,14 @@ export default function App() {
            )}
         </div>
 
-        <div className="p-3 border-t border-slate-200 bg-slate-100 flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-widest">
+        <div className="p-4 border-t border-slate-800 bg-[#050505] flex justify-between items-center text-[10px] text-slate-600 uppercase tracking-widest font-mono">
            <span>Rawson (2025)</span>
-           <span>v1.0.1</span>
+           <span>SYS.V.2.0.4</span>
         </div>
       </div>
 
       {/* Main Simulation Area */}
-      <div className="flex-1 relative bg-slate-900 overflow-hidden">
+      <div className="flex-1 relative bg-black overflow-hidden">
         <SimulationCanvas 
             particles={particles}
             config={currentStep.config}
@@ -265,14 +262,14 @@ export default function App() {
         />
 
         {/* Overlay Controls */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 z-20 items-end">
+        <div className="absolute top-6 right-6 flex flex-col gap-3 z-20 items-end">
             <div className="flex gap-2">
                 <button 
                     onClick={() => setShowHelp(true)}
-                    className="flex items-center justify-center w-10 h-10 bg-slate-800/80 hover:bg-slate-700 backdrop-blur text-cyan-400 rounded-full border border-slate-600 transition-all shadow-lg"
+                    className="flex items-center justify-center w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 rounded-lg border border-cyan-900/50 transition-all shadow-lg backdrop-blur"
                     title="Help"
                 >
-                    <Info size={20} />
+                    <Info size={24} />
                 </button>
                 <button 
                     onClick={() => {
@@ -280,71 +277,77 @@ export default function App() {
                         setParticles(setup);
                         latestParticlesRef.current = setup;
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800/80 hover:bg-slate-700 backdrop-blur text-white rounded-full border border-slate-600 transition-all text-sm font-medium shadow-lg"
+                    className="flex items-center gap-2 px-6 py-2 bg-slate-900/90 hover:bg-slate-800 text-white rounded-lg border border-slate-700 transition-all text-sm font-bold uppercase tracking-wide shadow-lg backdrop-blur"
                 >
-                    <RefreshCw size={16} /> Reset
+                    <RefreshCw size={18} /> Reset
                 </button>
                 <button 
                     onClick={() => setIsRunning(!isRunning)}
-                    className={`flex items-center gap-2 px-4 py-2 text-white rounded-full border border-slate-600 transition-all text-sm font-medium shadow-lg ${isRunning ? 'bg-rose-500/80 hover:bg-rose-600' : 'bg-emerald-500/80 hover:bg-emerald-600'}`}
+                    className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg border border-slate-700 transition-all text-sm font-bold uppercase tracking-wide shadow-lg backdrop-blur ${isRunning ? 'bg-red-900/80 hover:bg-red-800 text-red-200' : 'bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200'}`}
                 >
-                    {isRunning ? <><Pause size={16} /> Pause</> : <><Play size={16} /> Play</>}
+                    {isRunning ? <><Pause size={18} /> HALT</> : <><Play size={18} /> RUN</>}
                 </button>
             </div>
-            {/* Particle Controls */}
-            <div className="flex gap-1 bg-slate-800/80 rounded-full p-1 border border-slate-600 shadow-lg backdrop-blur">
-                 <button onClick={removeParticle} className="p-2 text-rose-400 hover:text-white hover:bg-slate-700 rounded-full" title="Remove Particle">
-                    <Minus size={16} />
+            
+            {/* Particle Controls - MADE LARGER AND MORE PROMINENT */}
+            <div className="flex gap-2 bg-slate-900/90 rounded-lg p-2 border border-cyan-900/30 shadow-xl backdrop-blur">
+                 <button 
+                    onClick={removeParticle} 
+                    className="p-3 bg-red-900/20 text-red-400 hover:text-white hover:bg-red-600 rounded-md border border-red-900/50 transition-all" 
+                    title="Remove Particle"
+                >
+                    <Minus size={20} />
                 </button>
-                <span className="text-slate-400 text-xs self-center px-1 font-mono">{particles.length}</span>
-                <button onClick={addParticle} className="p-2 text-emerald-400 hover:text-white hover:bg-slate-700 rounded-full" title="Add Particle">
-                    <Plus size={16} />
+                <span className="text-cyan-400 text-lg self-center px-3 font-mono font-bold w-12 text-center">{particles.length}</span>
+                <button 
+                    onClick={addParticle} 
+                    className="p-3 bg-emerald-900/20 text-emerald-400 hover:text-white hover:bg-emerald-600 rounded-md border border-emerald-900/50 transition-all" 
+                    title="Add Particle"
+                >
+                    <Plus size={20} />
                 </button>
             </div>
+
             {/* Camera Controls */}
-            <div className="flex gap-1 bg-slate-800/80 rounded-full p-1 border border-slate-600 shadow-lg backdrop-blur">
-                <button onClick={() => setZoom(z => Math.max(z * 0.9, 0.2))} className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full" title="Zoom Out (-)">
-                    <ZoomOut size={16} />
+            <div className="flex gap-1 bg-slate-900/90 rounded-lg p-1 border border-slate-800 shadow-xl backdrop-blur">
+                <button onClick={() => setZoom(z => Math.max(z * 0.9, 0.2))} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Zoom Out (-)">
+                    <ZoomOut size={18} />
                 </button>
-                 <button onClick={handleResetCamera} className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full" title="Reset Camera">
-                    <Maximize size={16} />
+                 <button onClick={handleResetCamera} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Reset Camera">
+                    <Maximize size={18} />
                 </button>
-                <button onClick={() => setZoom(z => Math.min(z * 1.1, 5))} className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full" title="Zoom In (+)">
-                    <ZoomIn size={16} />
+                <button onClick={() => setZoom(z => Math.min(z * 1.1, 5))} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Zoom In (+)">
+                    <ZoomIn size={18} />
                 </button>
             </div>
         </div>
 
         {/* Help Modal */}
         {showHelp && (
-            <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                <div className="bg-slate-800 rounded-2xl border border-slate-600 p-6 max-w-md w-full shadow-2xl relative">
-                    <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                        <X size={24} />
+            <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+                <div className="bg-slate-900 rounded border border-cyan-500/50 p-8 max-w-lg w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] relative">
+                    <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+                        <X size={28} />
                     </button>
-                    <h3 className="text-xl font-bold text-cyan-400 mb-4 flex items-center gap-2">
-                        <Info size={24} /> Playground Controls
+                    <h3 className="text-2xl font-bold text-cyan-400 mb-6 flex items-center gap-3 cyber-font uppercase">
+                        <Info size={28} /> Systems Manual
                     </h3>
-                    <ul className="space-y-3 text-slate-300 text-sm">
-                        <li className="flex items-start gap-3">
-                            <div className="bg-slate-700 p-2 rounded text-cyan-400"><RefreshCw size={16} /></div>
-                            <div><strong>Drag Particles:</strong> Click and hold any particle to move it.</div>
+                    <ul className="space-y-4 text-slate-300 text-base leading-relaxed">
+                        <li className="flex items-start gap-4">
+                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><RefreshCw size={20} /></div>
+                            <div><strong>Interaction:</strong> Drag particles to perturb the field.</div>
                         </li>
-                        <li className="flex items-start gap-3">
-                            <div className="bg-slate-700 p-2 rounded text-cyan-400"><Maximize size={16} /></div>
-                            <div><strong>Pan Camera:</strong> Click and drag anywhere on the background.</div>
+                        <li className="flex items-start gap-4">
+                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><Maximize size={20} /></div>
+                            <div><strong>Navigation:</strong> Pan by dragging the void. Zoom with +/-.</div>
                         </li>
-                        <li className="flex items-start gap-3">
-                            <div className="bg-slate-700 p-2 rounded text-cyan-400"><Plus size={16} /></div>
-                            <div><strong>Modify Swarm:</strong> Add or remove particles to test system stability.</div>
-                        </li>
-                         <li className="flex items-start gap-3">
-                            <div className="bg-slate-700 p-2 rounded text-cyan-400"><ZoomIn size={16} /></div>
-                            <div><strong>Zoom:</strong> Use the <code>+</code> and <code>-</code> keys or buttons.</div>
+                        <li className="flex items-start gap-4">
+                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><Plus size={20} /></div>
+                            <div><strong>Modification:</strong> Inject/Eject particles to test stability.</div>
                         </li>
                     </ul>
-                    <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold transition-colors">
-                        Got it!
+                    <button onClick={() => setShowHelp(false)} className="w-full mt-8 py-4 bg-cyan-700 hover:bg-cyan-600 rounded text-white font-bold transition-colors cyber-font uppercase tracking-widest">
+                        Acknowledge
                     </button>
                 </div>
             </div>
@@ -352,65 +355,65 @@ export default function App() {
 
         {/* Particle Inspector */}
         {selectedParticle && (
-            <div className="absolute top-4 left-4 w-64 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-600 shadow-2xl z-30 animate-fade-in-up p-4">
-                <div className="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
-                    <h4 className="text-cyan-400 font-bold flex items-center gap-2">
-                        <Microscope size={18} /> Particle {selectedParticle.id}
+            <div className="absolute top-6 left-6 w-72 bg-slate-900/90 backdrop-blur-md rounded border border-cyan-500/30 shadow-2xl z-30 animate-fade-in-up p-5">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+                    <h4 className="text-cyan-400 font-bold flex items-center gap-2 cyber-font">
+                        <Microscope size={20} /> NODE_{selectedParticle.id}
                     </h4>
                     <button onClick={() => setSelectedParticle(null)} className="text-slate-500 hover:text-white">&times;</button>
                 </div>
-                <div className="space-y-2 text-sm text-slate-200">
-                    <div className="flex justify-between">
-                        <span className="text-slate-400">Value (x):</span>
-                        <span className="font-mono text-white">{selectedParticle.val.toFixed(3)}</span>
+                <div className="space-y-3 text-sm text-slate-300">
+                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
+                        <span className="text-slate-400 uppercase text-xs tracking-wider">Activation (x)</span>
+                        <span className="font-mono text-cyan-300 font-bold text-lg">{selectedParticle.val.toFixed(3)}</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-slate-400">Phase (φ):</span>
-                        <span className="font-mono text-purple-400">{(selectedParticle.phase / Math.PI).toFixed(2)}π</span>
+                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
+                        <span className="text-slate-400 uppercase text-xs tracking-wider">Phase (φ)</span>
+                        <span className="font-mono text-purple-400 font-bold text-lg">{(selectedParticle.phase / Math.PI).toFixed(2)}π</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-slate-400">Spin (s):</span>
-                        <span className={`font-mono ${selectedParticle.spin > 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                            {selectedParticle.spin > 0 ? '↑ Up' : '↓ Down'}
+                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
+                        <span className="text-slate-400 uppercase text-xs tracking-wider">Spin (s)</span>
+                        <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                            {selectedParticle.spin > 0 ? '↑ UP' : '↓ DOWN'}
                         </span>
                     </div>
                 </div>
                 {selectedParticle.isFixed && (
-                    <div className="mt-3 text-xs bg-red-900/50 text-red-200 p-2 rounded border border-red-800 flex gap-2 items-center">
-                        <Info size={12} /> Sensory Node (Fixed)
+                    <div className="mt-4 text-xs bg-red-900/30 text-red-200 p-3 rounded border border-red-500/30 flex gap-2 items-center uppercase tracking-wider font-bold">
+                        <Info size={14} /> Sensory Node (Fixed)
                     </div>
                 )}
             </div>
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 p-4 bg-slate-900/80 backdrop-blur rounded-lg border border-slate-700 text-sm z-20 pointer-events-none text-slate-300">
-            <div className="font-bold mb-2 text-slate-400 uppercase text-xs tracking-wider">Legend</div>
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                    <span>Sensory Node</span>
+        <div className="absolute bottom-6 left-6 p-5 bg-slate-900/90 backdrop-blur rounded border border-slate-700 text-sm z-20 pointer-events-none text-slate-300 shadow-xl">
+            <div className="font-bold mb-3 text-slate-500 uppercase text-[10px] tracking-[0.2em] cyber-font">System Key</div>
+            <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
+                    <span className="font-mono text-xs">SENSORY_NODE</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                    <span>Processing Node</span>
+                <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_8px_#06b6d4]"></div>
+                    <span className="font-mono text-xs">PROCESSING_NODE</span>
                 </div>
                 {currentStep.config.spinEnabled && (
                     <>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full border-2 border-green-400"></div>
-                            <span>Spin Up (+0.5)</span>
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full border-2 border-emerald-500"></div>
+                            <span className="font-mono text-xs text-emerald-400">SPIN_UP (+0.5)</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full border-2 border-orange-400 bg-transparent border-dashed"></div>
-                            <span>Spin Down (-0.5)</span>
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full border-2 border-orange-500 bg-transparent border-dashed"></div>
+                            <span className="font-mono text-xs text-orange-400">SPIN_DOWN (-0.5)</span>
                         </div>
                     </>
                 )}
                 {currentStep.config.couplingEnabled && (
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-1 border-b-2 border-dashed border-yellow-400"></div>
-                        <span>Dynamic Coupling</span>
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-1 border-b-2 border-dashed border-purple-500"></div>
+                        <span className="font-mono text-xs text-purple-400">VIB_COUPLING</span>
                     </div>
                 )}
             </div>

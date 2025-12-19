@@ -1,15 +1,17 @@
-// 3Blue1Brown Color Palette Inspiration
+// Cyberpunk / Neon Palette
 export const COLORS = {
-  background: '#0f172a', // Slate 900
-  blue: '#38bdf8',       // Light Blue (Particles)
+  background: '#050505', // Void
+  panelBg: '#0a0a0a',
+  blue: '#06b6d4',       // Cyan (Particles)
   yellow: '#facc15',     // Yellow (Highlights/Energy)
   teal: '#2dd4bf',       // Teal (Secondary)
-  red: '#fb7185',        // Rose (Error/High Energy)
-  grey: '#64748b',       // Slate 500
+  red: '#f43f5e',        // Neon Pink/Red (Error/High Energy)
+  grey: '#475569',       // Slate
   white: '#f8fafc',
-  purple: '#c084fc',     // Violet (Phase)
-  green: '#4ade80',      // Spin Up
-  orange: '#fb923c',     // Spin Down
+  purple: '#d946ef',     // Fuchsia (Phase)
+  green: '#10b981',      // Neon Green (Spin Up)
+  orange: '#f97316',     // Neon Orange (Spin Down)
+  grid: '#1e293b',       // Grid lines
 };
 
 export const PHYSICS = {
@@ -18,11 +20,11 @@ export const PHYSICS = {
   eta: 0.05,
   eta_r: 0.05,
   sigma: 100,
-  damping: 0.95,
+  damping: 0.99, // Extremely low damping for persistent oscillations
   couplingEnabled: true,
   phaseEnabled: false,
   spinEnabled: false,
-  temperature: 0.1,
+  temperature: 0.6, // High temperature for energetic Brownian motion
 };
 
 export const CANVAS_WIDTH = 800;

@@ -36,3 +36,17 @@ export interface SimulationConfig {
   temperature: number;  // New: Brownian motion / Entropy
   damping: number;
 }
+
+export interface SymbolDefinition {
+  symbol: string;
+  definition: string;
+  context: string;
+}
+
+export interface LessonStep {
+  title: string;
+  content: React.ReactNode;
+  config: SimulationConfig;
+  setup: string;
+  symbols: SymbolDefinition[];
+}
