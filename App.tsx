@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
-import { Particle, Interaction, Vector2 } from './types';
+import { QuizModal } from './components/QuizModal'; // Imported
+import { Particle, Interaction, Vector2, QuizQuestion } from './types';
 import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
-import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus } from 'lucide-react';
+import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { LESSON_STEPS } from './lessons/content';
 import { createParticles } from './lessons/setups';
@@ -19,27 +20,42 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Vector2>({ x: 0, y: 0 });
   const [showHelp, setShowHelp] = useState(false);
+  const [showLearnMore, setShowLearnMore] = useState(false);
+  const [predictionError, setPredictionError] = useState<number | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Quiz State
+  const [quizState, setQuizState] = useState<{
+    active: boolean;
+    question: QuizQuestion | null;
+    targetStep: number;
+  }>({ active: false, question: null, targetStep: 0 });
 
   // Ref to track the LATEST state from the physics engine
   const latestParticlesRef = useRef<Particle[]>(particles);
   // Ref to prevent race conditions during add/remove operations
   const isUpdatingRef = useRef(false);
 
-  const currentStep = LESSON_STEPS[stepIndex];
+  // Safe check for bounds
+  const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
 
   // Reset when step changes
   useEffect(() => {
-    const newParticles = createParticles(currentStep.setup);
-    setParticles(newParticles);
-    latestParticlesRef.current = newParticles; 
-    isUpdatingRef.current = false;
-    setEnergyData([]);
-    setFrame(0);
-    setIsRunning(true);
-    setSelectedParticle(null);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }, [stepIndex, currentStep.setup]);
+    if (currentStep) {
+        const newParticles = createParticles(currentStep.setup);
+        setParticles(newParticles);
+        latestParticlesRef.current = newParticles; 
+        isUpdatingRef.current = false;
+        setEnergyData([]);
+        setFrame(0);
+        setIsRunning(true);
+        setSelectedParticle(null);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setPredictionError(null);
+        setShowLearnMore(false);
+    }
+  }, [stepIndex, currentStep?.setup]);
 
   // Keyboard Shortcuts for Zoom
   useEffect(() => {
@@ -54,7 +70,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleUpdate = (newParticles: Particle[], interactions: Interaction[], energy: { pred: number, pos: number }) => {
+  const handleUpdate = (newParticles: Particle[], interactions: Interaction[], energy: { pred: number, pos: number, historyError?: number }) => {
     if (!isUpdatingRef.current || newParticles.length === particles.length) {
         latestParticlesRef.current = newParticles;
         if (newParticles.length === particles.length) {
@@ -70,6 +86,12 @@ export default function App() {
         });
     }
     setFrame(f => f + 1);
+
+    if (energy.historyError !== undefined) {
+        setPredictionError(energy.historyError);
+    } else {
+        setPredictionError(null);
+    }
 
     if (selectedParticle) {
         const updated = newParticles.find(p => p.id === selectedParticle.id);
@@ -115,6 +137,42 @@ export default function App() {
   const handleResetCamera = () => {
       setZoom(1);
       setPan({ x: 0, y: 0 });
+  };
+
+  // --- Quiz Logic ---
+  const attemptNextStep = () => {
+      const nextIndex = Math.min(LESSON_STEPS.length - 1, stepIndex + 1);
+      
+      // Check if current step has questions
+      if (currentStep.questions && currentStep.questions.length > 0) {
+          // Pick a random question
+          const qIndex = Math.floor(Math.random() * currentStep.questions.length);
+          const question = currentStep.questions[qIndex];
+          setQuizState({
+              active: true,
+              question: question,
+              targetStep: nextIndex
+          });
+      } else {
+          // No quiz, just go
+          setStepIndex(nextIndex);
+      }
+  };
+
+  const handleQuizComplete = () => {
+      setQuizState(prev => ({ ...prev, active: false }));
+      setStepIndex(quizState.targetStep);
+  };
+
+  const handleQuizCancel = () => {
+      setQuizState(prev => ({ ...prev, active: false }));
+      // Optional: Don't advance, or advance anyway? Let's advance for UX
+      setStepIndex(quizState.targetStep);
+  };
+
+  const handleJumpToStep = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const idx = parseInt(e.target.value);
+      setStepIndex(idx);
   };
 
   // --- Splash Screen ---
@@ -167,11 +225,12 @@ export default function App() {
     <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden text-slate-200 bg-black">
       
       {/* Sidebar / Lesson Control */}
+      {!isFullScreen && (
       <div className="w-full md:w-2/5 flex flex-col border-r border-slate-800 bg-[#080808] z-10 shadow-2xl relative">
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] pointer-events-none"></div>
 
         <div className="p-8 border-b border-slate-800 bg-black/50 backdrop-blur-sm">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-4">
              <button onClick={() => setHasStarted(false)} className="hover:text-cyan-400 transition-colors" title="Back to Title">
                 <Sparkles size={28} className="text-cyan-500 neon-text" />
              </button>
@@ -179,10 +238,30 @@ export default function App() {
                 QUANTUM PCN
              </h1>
           </div>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] cyber-font pl-10">Interactive Learning Module</h2>
+          
+          {/* Quick Jump Dropdown */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <List size={16} />
+            </div>
+            <select 
+                value={stepIndex} 
+                onChange={handleJumpToStep}
+                className="w-full bg-slate-900/80 border border-slate-700 text-cyan-400 text-sm rounded pl-10 pr-4 py-2 appearance-none cursor-pointer hover:border-cyan-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono uppercase tracking-wide"
+            >
+                {LESSON_STEPS.map((step, idx) => (
+                    <option key={idx} value={idx}>
+                        {idx + 1}. {step.title.split(':')[0]}
+                    </option>
+                ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                <ChevronRight size={16} className="rotate-90" />
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber">
+        <div className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber pb-24">
            
            <h3 className="text-3xl md:text-4xl font-bold text-slate-100 cyber-font leading-tight border-b-2 border-cyan-900/50 pb-4">
             {currentStep.title}
@@ -191,6 +270,17 @@ export default function App() {
            <div className="text-slate-200 text-xl md:text-2xl leading-relaxed font-normal tracking-wide">
              {currentStep.content}
            </div>
+
+           {/* Learn More Button */}
+           {currentStep.explanation && (
+             <button 
+                onClick={() => setShowLearnMore(true)}
+                className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg flex items-center justify-center gap-2 transition-all group"
+             >
+                <BookOpen size={20} className="group-hover:scale-110 transition-transform"/>
+                <span className="uppercase tracking-widest font-bold text-sm">Open Deep Dive Module</span>
+             </button>
+           )}
 
            {/* NEW: Symbol Table Component */}
            <SymbolTable symbols={currentStep.symbols} />
@@ -206,7 +296,7 @@ export default function App() {
                 </button>
 
                 <button 
-                  onClick={() => setStepIndex(Math.min(LESSON_STEPS.length - 1, stepIndex + 1))}
+                  onClick={attemptNextStep}
                   disabled={stepIndex === LESSON_STEPS.length - 1}
                   className="flex-1 px-6 py-4 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-wider cyber-font"
                 >
@@ -246,6 +336,7 @@ export default function App() {
            <span>SYS.V.2.0.4</span>
         </div>
       </div>
+      )}
 
       {/* Main Simulation Area */}
       <div className="flex-1 relative bg-black overflow-hidden">
@@ -260,10 +351,36 @@ export default function App() {
             pan={pan}
             onPan={setPan}
         />
+        
+        {/* Prediction Error HUD (Step 14 specific) */}
+        {currentStep.config.showGhosts && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-yellow-500/50 shadow-[0_0_20px_rgba(250,204,21,0.2)] flex items-center gap-4 z-20">
+                <div className="flex items-center gap-2 text-yellow-500">
+                    <ScanEye size={20} className="animate-pulse" />
+                    <span className="text-xs font-bold uppercase tracking-widest cyber-font">Visual Link</span>
+                </div>
+                <div className="h-4 w-[1px] bg-slate-700"></div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wide">Prediction Deviation</span>
+                    <span className="text-sm font-mono font-bold text-white">
+                        {predictionError !== null ? predictionError.toFixed(2) + ' units' : 'CALCULATING...'}
+                    </span>
+                </div>
+                <div className="h-4 w-[1px] bg-slate-700"></div>
+                 <span className="text-[10px] text-slate-500 font-mono uppercase">Ghost Physics: OFF</span>
+            </div>
+        )}
 
         {/* Overlay Controls */}
         <div className="absolute top-6 right-6 flex flex-col gap-3 z-20 items-end">
             <div className="flex gap-2">
+                <button
+                    onClick={() => setIsFullScreen(!isFullScreen)}
+                    className="flex items-center justify-center w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 rounded-lg border border-cyan-900/50 transition-all shadow-lg backdrop-blur"
+                    title={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                    {isFullScreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
+                </button>
                 <button 
                     onClick={() => setShowHelp(true)}
                     className="flex items-center justify-center w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 rounded-lg border border-cyan-900/50 transition-all shadow-lg backdrop-blur"
@@ -289,7 +406,7 @@ export default function App() {
                 </button>
             </div>
             
-            {/* Particle Controls - MADE LARGER AND MORE PROMINENT */}
+            {/* Particle Controls */}
             <div className="flex gap-2 bg-slate-900/90 rounded-lg p-2 border border-cyan-900/30 shadow-xl backdrop-blur">
                  <button 
                     onClick={removeParticle} 
@@ -321,6 +438,48 @@ export default function App() {
                 </button>
             </div>
         </div>
+
+        {/* QUIZ MODAL */}
+        {quizState.active && quizState.question && (
+            <QuizModal 
+                questionData={quizState.question}
+                onComplete={handleQuizComplete}
+                onCancel={handleQuizCancel}
+            />
+        )}
+
+        {/* LEARN MORE MODAL */}
+        {showLearnMore && (
+            <div className="absolute inset-0 bg-black/95 z-[60] flex items-center justify-center p-4 backdrop-blur-lg animate-fade-in">
+                <div className="bg-[#050505] rounded-xl border border-cyan-500/50 max-w-4xl w-full h-[80vh] shadow-[0_0_100px_rgba(6,182,212,0.15)] relative flex flex-col overflow-hidden">
+                    {/* Header */}
+                    <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/20 shrink-0">
+                        <div>
+                             <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-2 cyber-font flex items-center gap-3">
+                                <GraduationCap size={32} />
+                                DEEP DIVE: MODULE {stepIndex + 1}
+                            </h3>
+                             <p className="text-slate-400 text-lg uppercase tracking-wide font-mono">{currentStep.title}</p>
+                        </div>
+                        <button onClick={() => setShowLearnMore(false)} className="text-slate-500 hover:text-white hover:bg-slate-800 p-2 rounded transition-colors">
+                            <X size={32} />
+                        </button>
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 text-slate-300 leading-8 text-lg scrollbar-cyber max-h-full pr-4">
+                        {currentStep.explanation}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="p-6 border-t border-slate-800 bg-slate-900/30 flex justify-end shrink-0">
+                        <button onClick={() => setShowLearnMore(false)} className="px-8 py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold uppercase tracking-widest transition-colors cyber-font">
+                            Return to Simulation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Help Modal */}
         {showHelp && (

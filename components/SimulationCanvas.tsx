@@ -5,7 +5,7 @@ import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 interface SimulationCanvasProps {
   particles: Particle[];
   config: SimulationConfig;
-  onUpdate: (particles: Particle[], interactions: Interaction[], energy: { pred: number; pos: number }) => void;
+  onUpdate: (particles: Particle[], interactions: Interaction[], energy: { pred: number; pos: number; historyError?: number }) => void;
   onSelectParticle: (p: Particle | null) => void;
   isRunning: boolean;
   interactionMode: 'drag' | 'perturb';
@@ -52,6 +52,10 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const isDragging = useRef<boolean>(false);
   const particlesRef = useRef(particles);
   const panStartRef = useRef<Vector2 | null>(null);
+  
+  // Prediction Verification System
+  const simFrameRef = useRef(0);
+  const predictionHistoryRef = useRef<Map<number, Record<number, Vector2>>>(new Map());
 
   useEffect(() => {
     particlesRef.current = particles;
@@ -77,6 +81,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       setParticles(initialParticles);
       setInteractions([]);
       setResetAnim(null);
+      // Clear prediction history on reset
+      predictionHistoryRef.current.clear();
+      simFrameRef.current = 0;
     }
   }, [initialParticles]);
 
@@ -107,6 +114,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
            },
            val: pStart.val + (pEnd.val - pStart.val) * ease,
            vel: { x: 0, y: 0 },
+           force: { x: 0, y: 0 },
            valVel: 0,
            phaseVel: 0.1 
          };
@@ -118,6 +126,52 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     let newInteractions: Interaction[] = [];
     let totalPredEnergy = 0;
     let totalPosEnergy = 0;
+    
+    // --- Prediction Accuracy Verification Logic ---
+    simFrameRef.current++;
+    const currentFrame = simFrameRef.current;
+    let historyError = 0;
+
+    if (config.showGhosts) {
+        const LOOKAHEAD = 60; // 1 second approx
+        const targetFrame = currentFrame + LOOKAHEAD;
+
+        // 1. Record CURRENT Kinematic predictions for the future (Force-aware)
+        const currentPredictions: Record<number, Vector2> = {};
+        currentParticles.forEach(p => {
+             // Kinematic equation: r_f = r_i + v*t + 0.5*a*t^2
+             // Acceleration approximated by current force acting on mass (eta_r acts as 1/m * dt)
+             const accX = (p.force?.x || 0) * config.eta_r;
+             const accY = (p.force?.y || 0) * config.eta_r;
+             
+             currentPredictions[p.id] = {
+                 x: p.pos.x + p.vel.x * LOOKAHEAD + 0.5 * accX * LOOKAHEAD * LOOKAHEAD,
+                 y: p.pos.y + p.vel.y * LOOKAHEAD + 0.5 * accY * LOOKAHEAD * LOOKAHEAD
+             };
+        });
+        predictionHistoryRef.current.set(targetFrame, currentPredictions);
+
+        // 2. Validate PAST predictions against current reality
+        const pastPredictions = predictionHistoryRef.current.get(currentFrame);
+        if (pastPredictions) {
+             let totalError = 0;
+             let count = 0;
+             currentParticles.forEach(p => {
+                 const pred = pastPredictions[p.id];
+                 if (pred) {
+                     const d = dist(p.pos, pred);
+                     totalError += d;
+                     count++;
+                 }
+             });
+             if (count > 0) historyError = totalError / count;
+             predictionHistoryRef.current.delete(currentFrame); // Cleanup
+        }
+    } else {
+        if (predictionHistoryRef.current.size > 0) predictionHistoryRef.current.clear();
+    }
+    // ---------------------------------------------
+
 
     // 1. Calculate Interactions
     for (let i = 0; i < currentParticles.length; i++) {
@@ -150,7 +204,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         let ty = mousePosRef.current.y;
         tx = Math.max(10, Math.min(CANVAS_WIDTH - 10, tx));
         ty = Math.max(10, Math.min(CANVAS_HEIGHT - 10, ty));
-        return { ...p, pos: { x: tx, y: ty }, vel: { x: 0, y: 0 }, valVel: 0 };
+        return { ...p, pos: { x: tx, y: ty }, vel: { x: 0, y: 0 }, force: {x:0,y:0}, valVel: 0 };
       }
 
       if (p.isFixed) return p;
@@ -169,6 +223,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const other = currentParticles.find(op => op.id === otherId);
         if (!other) return;
         
+        // Use coupling for state prediction weight
         const w_ij = int.strength * (config.couplingEnabled ? int.coupling : 1);
         predictedState += w_ij * other.val;
         totalWeight += w_ij;
@@ -178,7 +233,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const unitX = (p.pos.x - other.pos.x) / d;
         const unitY = (p.pos.y - other.pos.y) / d;
         
-        const forceMag = -config.k * displacement; 
+        // Spin modulation for physical force (Attraction/Repulsion strength)
+        // If spin enabled: Aligned spins -> Stronger bond. Opposite spins -> Weaker bond.
+        const spinFactor = config.spinEnabled ? (1 + 2.0 * (p.spin * other.spin)) : 1.0;
+        
+        const forceMag = -config.k * displacement * spinFactor; 
         totalPosEnergy += 0.5 * config.k * (displacement ** 2);
 
         forcePos.x += forceMag * unitX;
@@ -199,11 +258,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       const noiseY = gaussianRandom() * config.temperature;
 
       // Apply forces and damping
-      // Velocity Verlet-ish integration
-      let newVelX = (p.vel.x + forcePos.x * config.eta_r + noiseX) * config.damping;
-      let newVelY = (p.vel.y + forcePos.y * config.eta_r + noiseY) * config.damping;
+      // Velocity Verlet-ish integration with separated damping (Langevin-like)
+      // v(t+1) = v(t) * damping + Force + Noise
+      // This preserves momentum slightly better than applying damping to the sum
+      let newVelX = p.vel.x * config.damping + (forcePos.x * config.eta_r) + noiseX;
+      let newVelY = p.vel.y * config.damping + (forcePos.y * config.eta_r) + noiseY;
       
-      const newValVel = (p.valVel + forceState) * config.damping;
+      const newValVel = p.valVel * config.damping + forceState;
       
       const newPhaseVel = phaseDrift + 0.02; 
       const newPhase = (p.phase + newPhaseVel) % (2 * Math.PI);
@@ -222,6 +283,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         ...p,
         pos: { x: nextX, y: nextY },
         vel: { x: newVelX, y: newVelY },
+        force: forcePos, // Store current force for prediction
         val: p.val + newValVel,
         valVel: newValVel,
         phase: newPhase,
@@ -229,7 +291,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       };
     });
 
-    return { particles: nextParticles, interactions: newInteractions, energy: { pred: totalPredEnergy, pos: totalPosEnergy } };
+    return { particles: nextParticles, interactions: newInteractions, energy: { pred: totalPredEnergy, pos: totalPosEnergy, historyError } };
   }, [particles, config, resetAnim]);
 
   const animate = useCallback(() => {
@@ -349,6 +411,45 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
               strokeOpacity={opacity * 0.8}
               strokeDasharray={opacity < 0.3 ? "4,4" : "0"}
             />
+          );
+      })}
+
+      {/* Ghost Particles (Future Prediction) */}
+      {config.showGhosts && particles.map(p => {
+          // Predict position 60 frames (approx 1s) into the future
+          const FUTURE_FRAMES = 60;
+          
+          // Kinematic Prediction using stored force: r + v*t + 0.5*a*t^2
+          const accX = (p.force?.x || 0) * config.eta_r;
+          const accY = (p.force?.y || 0) * config.eta_r;
+          
+          const ghostX = p.pos.x + p.vel.x * FUTURE_FRAMES + 0.5 * accX * FUTURE_FRAMES * FUTURE_FRAMES;
+          const ghostY = p.pos.y + p.vel.y * FUTURE_FRAMES + 0.5 * accY * FUTURE_FRAMES * FUTURE_FRAMES;
+
+          return (
+            <g key={`ghost-${p.id}`} className="pointer-events-none opacity-40">
+                {/* Trajectory Line - Quad Curve approx */}
+                <path 
+                    d={`M ${p.pos.x} ${p.pos.y} Q ${p.pos.x + p.vel.x * FUTURE_FRAMES * 0.5} ${p.pos.y + p.vel.y * FUTURE_FRAMES * 0.5} ${ghostX} ${ghostY}`}
+                    stroke={p.color} 
+                    fill="none"
+                    strokeWidth={1} 
+                    strokeDasharray="4,4" 
+                    opacity={0.5}
+                />
+                {/* Ghost Body */}
+                <circle 
+                    cx={ghostX} cy={ghostY} 
+                    r={8} 
+                    fill="transparent" 
+                    stroke={p.color} 
+                    strokeWidth={1} 
+                    strokeDasharray="2,2"
+                />
+                <text x={ghostX} y={ghostY} dy={-12} textAnchor="middle" fontSize="8" fill={p.color} opacity={0.7} fontFamily="monospace">
+                    t+1s
+                </text>
+            </g>
           );
       })}
 

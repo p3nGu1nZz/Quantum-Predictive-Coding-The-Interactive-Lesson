@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface Vector2 {
   x: number;
   y: number;
@@ -7,6 +9,7 @@ export interface Particle {
   id: number;
   pos: Vector2;       // r_i
   vel: Vector2;       // dr_i/dt
+  force?: Vector2;    // F_i (Accumulated Force) for prediction
   val: number;        // x_i (Internal State/Activation)
   valVel: number;     // dx_i/dt
   phase: number;      // phi_i (Vibrational Phase)
@@ -33,6 +36,7 @@ export interface SimulationConfig {
   couplingEnabled: boolean;
   phaseEnabled: boolean;
   spinEnabled: boolean; // New: Toggle spin influence
+  showGhosts?: boolean; // New: Toggle future position prediction visualization
   temperature: number;  // New: Brownian motion / Entropy
   damping: number;
 }
@@ -43,10 +47,18 @@ export interface SymbolDefinition {
   context: string;
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+}
+
 export interface LessonStep {
   title: string;
   content: React.ReactNode;
   config: SimulationConfig;
   setup: string;
   symbols: SymbolDefinition[];
+  explanation?: React.ReactNode; // Extended educational content
+  questions?: QuizQuestion[]; // Pool of questions for the transition quiz
 }
