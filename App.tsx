@@ -182,8 +182,6 @@ export default function App() {
       setQuizState(prev => ({ ...prev, active: false }));
       
       // If correct or skipped, we advance.
-      // If we wanted to force correctness, we wouldn't have called this on skip.
-      // But user wants "Skip" button.
       setStepIndex(quizState.targetStep);
   };
 
@@ -583,37 +581,6 @@ export default function App() {
             </div>
         )}
 
-        {/* Help Modal */}
-        {showHelp && (
-            <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                <div className="bg-slate-900 rounded border border-cyan-500/50 p-8 max-w-lg w-full shadow-[0_0_50px_rgba(6,182,212,0.2)] relative">
-                    <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
-                        <X size={28} />
-                    </button>
-                    <h3 className="text-2xl font-bold text-cyan-400 mb-6 flex items-center gap-3 cyber-font uppercase">
-                        <Info size={28} /> Systems Manual
-                    </h3>
-                    <ul className="space-y-4 text-slate-300 text-base leading-relaxed">
-                        <li className="flex items-start gap-4">
-                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><RefreshCw size={20} /></div>
-                            <div><strong>Interaction:</strong> Drag particles to perturb the field.</div>
-                        </li>
-                        <li className="flex items-start gap-4">
-                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><Maximize size={20} /></div>
-                            <div><strong>Navigation:</strong> Pan by dragging the void. Zoom with +/-.</div>
-                        </li>
-                        <li className="flex items-start gap-4">
-                            <div className="bg-slate-800 p-2 rounded text-cyan-400"><Plus size={20} /></div>
-                            <div><strong>Modification:</strong> Inject/Eject particles to test stability.</div>
-                        </li>
-                    </ul>
-                    <button onClick={() => setShowHelp(false)} className="w-full mt-8 py-4 bg-cyan-700 hover:bg-cyan-600 rounded text-white font-bold transition-colors cyber-font uppercase tracking-widest">
-                        Acknowledge
-                    </button>
-                </div>
-            </div>
-        )}
-
         {/* Particle Inspector */}
         {selectedParticle && (
             <div className="absolute top-6 left-6 w-72 bg-slate-900/90 backdrop-blur-md rounded border border-cyan-500/30 shadow-2xl z-30 animate-fade-in-up p-5">
@@ -634,9 +601,12 @@ export default function App() {
                     </div>
                     <div className="flex justify-between items-center bg-black/30 p-2 rounded">
                         <span className="text-slate-400 uppercase text-xs tracking-wider">Spin (s)</span>
-                        <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                            {selectedParticle.spin > 0 ? '↑ UP' : '↓ DOWN'}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                                {selectedParticle.spin > 0 ? '↑ UP' : '↓ DOWN'}
+                            </span>
+                             <span className="text-[10px] text-slate-500 font-mono">Value: {selectedParticle.spin > 0 ? '+0.5' : '-0.5'}</span>
+                        </div>
                     </div>
                 </div>
                 {selectedParticle.isFixed && (

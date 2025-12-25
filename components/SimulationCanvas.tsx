@@ -437,18 +437,16 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           );
       })}
 
-      {/* Fading Particle Trails */}
+      {/* Fading Particle Trails (Recent History) */}
       {particles.map(p => {
           const trail = trailsRef.current.get(p.id) || [];
           if (trail.length < 2) return null;
           
-          // Draw trail as segments to allow for gradient fading
           return (
             <g key={`trail-${p.id}`} className="pointer-events-none">
               {trail.map((point, index) => {
                  if (index === 0) return null;
                  const prev = trail[index - 1];
-                 // Opacity increases towards the current position
                  const opacity = (index / trail.length) * 0.4; 
                  return (
                    <line 
@@ -465,32 +463,37 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           );
       })}
 
-      {/* Ghost Particles (Future Prediction) */}
+      {/* Ghost Particles (Future Prediction) with Smooth Gradient */}
       {config.showGhosts && particles.map(p => {
           const accX = (p.force?.x || 0) * config.eta_r;
           const accY = (p.force?.y || 0) * config.eta_r;
 
-          // Iterative simulation for accurate trajectory (up to 5s / 300 frames)
           let simX = p.pos.x;
           let simY = p.pos.y;
           let simVx = p.vel.x;
           let simVy = p.vel.y;
-
-          let trailPath = `M ${simX} ${simY}`;
           
+          const ghostSegments: {x1: number, y1: number, x2: number, y2: number, opacity: number}[] = [];
           const ghostMarkers = [];
           const keyframes = [60, 180, 300]; // 1s, 3s, 5s
 
+          let prevX = simX;
+          let prevY = simY;
+
           for (let f = 1; f <= 300; f++) {
-              // Apply physics logic matching main loop
               simVx = simVx * config.damping + accX;
               simVy = simVy * config.damping + accY;
               simX += simVx;
               simY += simVy;
 
-              if (f % 15 === 0) {
-                  trailPath += ` L ${simX} ${simY}`;
+              if (f % 5 === 0) {
+                 // Opacity decreases into the future
+                 const opacity = Math.max(0.05, 0.6 - (f / 300) * 0.6);
+                 ghostSegments.push({ x1: prevX, y1: prevY, x2: simX, y2: simY, opacity });
+                 prevX = simX;
+                 prevY = simY;
               }
+
               if (keyframes.includes(f)) {
                   ghostMarkers.push({ x: simX, y: simY, t: f/60 });
               }
@@ -498,20 +501,22 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
           return (
             <g key={`ghost-${p.id}`} className="pointer-events-none">
-                {/* Predicted Path Trail */}
-                <path 
-                    d={trailPath}
-                    stroke={p.color} 
-                    fill="none"
-                    strokeWidth={1} 
-                    strokeDasharray="3,3" 
-                    opacity={0.3}
-                />
+                {/* Predicted Path Segments (Gradient Fading) */}
+                {ghostSegments.map((seg, idx) => (
+                    <line 
+                        key={idx}
+                        x1={seg.x1} y1={seg.y1}
+                        x2={seg.x2} y2={seg.y2}
+                        stroke={p.color}
+                        strokeWidth={1}
+                        strokeDasharray="2,4"
+                        strokeOpacity={seg.opacity}
+                    />
+                ))}
                 
-                {/* Ghost Indicators at 1s, 3s, 5s */}
+                {/* Ghost Indicators with Pulsing Animation */}
                 {ghostMarkers.map((m, i) => {
-                    // Fade out further predictions
-                    const opacity = 0.7 - (i * 0.2); 
+                    const opacity = 0.8 - (i * 0.2); 
                     const radius = 8 - i * 2;
                     return (
                         <g key={i} opacity={opacity}>
@@ -522,6 +527,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                                 stroke={p.color} 
                                 strokeWidth={1} 
                                 strokeDasharray="2,2"
+                                className="animate-pulse"
                             />
                             <text 
                                 x={m.x} y={m.y} dy={-radius - 4} 
@@ -569,16 +575,34 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             {/* Halo */}
             <circle cx={p.pos.x} cy={p.pos.y} r={radius + 13} fill="transparent" stroke="transparent" /> 
 
-            {/* Spin indicator */}
+            {/* Spin indicator (Visual Arrow) */}
             {config.spinEnabled && (
-                <circle 
-                    cx={p.pos.x} cy={p.pos.y} r={radius + 4} 
-                    stroke={baseColor} 
-                    strokeWidth={2} 
-                    strokeDasharray={p.spin > 0 ? "0" : "3,2"}
-                    fill="none"
-                    opacity={0.8}
-                />
+                <g transform={`translate(${p.pos.x}, ${p.pos.y})`}>
+                     {/* Outer Ring */}
+                     <circle 
+                        r={radius + 4} 
+                        stroke={baseColor} 
+                        strokeWidth={1} 
+                        strokeDasharray={p.spin > 0 ? "0" : "3,2"}
+                        fill="none"
+                        opacity={0.6}
+                    />
+                    {/* Spin Direction Arrow */}
+                    <path 
+                        d={p.spin > 0 ? "M -4 2 L 0 -4 L 4 2" : "M -4 -2 L 0 4 L 4 -2"}
+                        stroke={baseColor}
+                        strokeWidth={2}
+                        fill="none"
+                        transform={`translate(${radius + 4 + 4}, 0)`}
+                    />
+                    <path 
+                        d={p.spin > 0 ? "M -4 2 L 0 -4 L 4 2" : "M -4 -2 L 0 4 L 4 -2"}
+                        stroke={baseColor}
+                        strokeWidth={2}
+                        fill="none"
+                        transform={`translate(-${radius + 4 + 4}, 0)`}
+                    />
+                </g>
             )}
 
             {/* Phase Orbit */}
