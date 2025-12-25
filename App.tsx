@@ -4,7 +4,7 @@ import { SymbolTable } from './components/SymbolTable';
 import { QuizModal } from './components/QuizModal'; // Imported
 import { Particle, Interaction, Vector2, QuizQuestion } from './types';
 import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
-import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2 } from 'lucide-react';
+import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { LESSON_STEPS } from './lessons/content';
 import { createParticles } from './lessons/setups';
@@ -354,20 +354,39 @@ export default function App() {
         
         {/* Prediction Error HUD (Step 14 specific) */}
         {currentStep.config.showGhosts && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-yellow-500/50 shadow-[0_0_20px_rgba(250,204,21,0.2)] flex items-center gap-4 z-20">
-                <div className="flex items-center gap-2 text-yellow-500">
-                    <ScanEye size={20} className="animate-pulse" />
-                    <span className="text-xs font-bold uppercase tracking-widest cyber-font">Visual Link</span>
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
+                <div className="bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-yellow-500/50 shadow-[0_0_20px_rgba(250,204,21,0.2)] flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-yellow-500">
+                        <ScanEye size={20} className="animate-pulse" />
+                        <span className="text-xs font-bold uppercase tracking-widest cyber-font">Visual Link</span>
+                    </div>
+                    <div className="h-4 w-[1px] bg-slate-700"></div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wide">Prediction Deviation</span>
+                        <span className="text-sm font-mono font-bold text-white">
+                            {predictionError !== null ? predictionError.toFixed(2) + ' units' : 'CALCULATING...'}
+                        </span>
+                    </div>
+                    <div className="h-4 w-[1px] bg-slate-700"></div>
+                    <div className="group relative flex items-center gap-2 cursor-help">
+                        <span className="text-[10px] text-slate-500 font-mono uppercase">Ghost Physics</span>
+                        <HelpCircle size={14} className="text-yellow-500" />
+                        
+                        {/* Tooltip */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-72 bg-slate-900/95 border border-yellow-500/30 p-4 rounded-lg text-xs text-slate-300 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none backdrop-blur-xl">
+                            <h5 className="font-bold text-yellow-400 mb-2 uppercase cyber-font">Kinematic Projection</h5>
+                            <p className="mb-2 leading-relaxed">
+                                Ghost particles visualize the network's <strong>forward prediction</strong> (approx. 1 second into the future).
+                            </p>
+                            <div className="bg-black/50 p-2 rounded mb-2 font-mono text-cyan-300 border border-slate-700">
+                                r(t+1) = r + v·t + ½·a·t²
+                            </div>
+                            <p className="text-slate-400 italic">
+                                The distance between the solid particle (Reality) and the ghost (Prediction) is the visual representation of <strong>Free Energy</strong>.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-                <div className="h-4 w-[1px] bg-slate-700"></div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wide">Prediction Deviation</span>
-                    <span className="text-sm font-mono font-bold text-white">
-                        {predictionError !== null ? predictionError.toFixed(2) + ' units' : 'CALCULATING...'}
-                    </span>
-                </div>
-                <div className="h-4 w-[1px] bg-slate-700"></div>
-                 <span className="text-[10px] text-slate-500 font-mono uppercase">Ghost Physics: OFF</span>
             </div>
         )}
 

@@ -133,21 +133,31 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     let historyError = 0;
 
     if (config.showGhosts) {
-        const LOOKAHEAD = 60; // 1 second approx
-        const targetFrame = currentFrame + LOOKAHEAD;
+        const PREDICTION_FRAMES = 60; // Check accuracy at 1 second
+        const targetFrame = currentFrame + PREDICTION_FRAMES;
 
-        // 1. Record CURRENT Kinematic predictions for the future (Force-aware)
+        // 1. Record CURRENT Kinematic predictions for the future (Force-aware & Damped)
         const currentPredictions: Record<number, Vector2> = {};
         currentParticles.forEach(p => {
-             // Kinematic equation: r_f = r_i + v*t + 0.5*a*t^2
-             // Acceleration approximated by current force acting on mass (eta_r acts as 1/m * dt)
+             // Instead of a simple formula, we iteratively simulate the particle's motion
+             // to account for damping, which provides a much more accurate prediction.
+             let predX = p.pos.x;
+             let predY = p.pos.y;
+             let predVx = p.vel.x;
+             let predVy = p.vel.y;
+             
+             // Assume current force remains constant (approximate)
              const accX = (p.force?.x || 0) * config.eta_r;
              const accY = (p.force?.y || 0) * config.eta_r;
              
-             currentPredictions[p.id] = {
-                 x: p.pos.x + p.vel.x * LOOKAHEAD + 0.5 * accX * LOOKAHEAD * LOOKAHEAD,
-                 y: p.pos.y + p.vel.y * LOOKAHEAD + 0.5 * accY * LOOKAHEAD * LOOKAHEAD
-             };
+             for(let i = 0; i < PREDICTION_FRAMES; i++) {
+                 predVx = predVx * config.damping + accX;
+                 predVy = predVy * config.damping + accY;
+                 predX += predVx;
+                 predY += predVy;
+             }
+             
+             currentPredictions[p.id] = { x: predX, y: predY };
         });
         predictionHistoryRef.current.set(targetFrame, currentPredictions);
 
@@ -416,39 +426,74 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
       {/* Ghost Particles (Future Prediction) */}
       {config.showGhosts && particles.map(p => {
-          // Predict position 60 frames (approx 1s) into the future
-          const FUTURE_FRAMES = 60;
-          
-          // Kinematic Prediction using stored force: r + v*t + 0.5*a*t^2
           const accX = (p.force?.x || 0) * config.eta_r;
           const accY = (p.force?.y || 0) * config.eta_r;
+
+          // Iterative simulation for accurate trajectory (up to 5s / 300 frames)
+          let simX = p.pos.x;
+          let simY = p.pos.y;
+          let simVx = p.vel.x;
+          let simVy = p.vel.y;
+
+          let trailPath = `M ${simX} ${simY}`;
           
-          const ghostX = p.pos.x + p.vel.x * FUTURE_FRAMES + 0.5 * accX * FUTURE_FRAMES * FUTURE_FRAMES;
-          const ghostY = p.pos.y + p.vel.y * FUTURE_FRAMES + 0.5 * accY * FUTURE_FRAMES * FUTURE_FRAMES;
+          const ghostMarkers = [];
+          const keyframes = [60, 180, 300]; // 1s, 3s, 5s
+
+          for (let f = 1; f <= 300; f++) {
+              // Apply physics logic matching main loop
+              simVx = simVx * config.damping + accX;
+              simVy = simVy * config.damping + accY;
+              simX += simVx;
+              simY += simVy;
+
+              if (f % 15 === 0) {
+                  trailPath += ` L ${simX} ${simY}`;
+              }
+              if (keyframes.includes(f)) {
+                  ghostMarkers.push({ x: simX, y: simY, t: f/60 });
+              }
+          }
 
           return (
-            <g key={`ghost-${p.id}`} className="pointer-events-none opacity-40">
-                {/* Trajectory Line - Quad Curve approx */}
+            <g key={`ghost-${p.id}`} className="pointer-events-none">
+                {/* Predicted Path Trail */}
                 <path 
-                    d={`M ${p.pos.x} ${p.pos.y} Q ${p.pos.x + p.vel.x * FUTURE_FRAMES * 0.5} ${p.pos.y + p.vel.y * FUTURE_FRAMES * 0.5} ${ghostX} ${ghostY}`}
+                    d={trailPath}
                     stroke={p.color} 
                     fill="none"
                     strokeWidth={1} 
-                    strokeDasharray="4,4" 
-                    opacity={0.5}
+                    strokeDasharray="3,3" 
+                    opacity={0.3}
                 />
-                {/* Ghost Body */}
-                <circle 
-                    cx={ghostX} cy={ghostY} 
-                    r={8} 
-                    fill="transparent" 
-                    stroke={p.color} 
-                    strokeWidth={1} 
-                    strokeDasharray="2,2"
-                />
-                <text x={ghostX} y={ghostY} dy={-12} textAnchor="middle" fontSize="8" fill={p.color} opacity={0.7} fontFamily="monospace">
-                    t+1s
-                </text>
+                
+                {/* Ghost Indicators at 1s, 3s, 5s */}
+                {ghostMarkers.map((m, i) => {
+                    // Fade out further predictions
+                    const opacity = 0.7 - (i * 0.2); 
+                    const radius = 8 - i * 2;
+                    return (
+                        <g key={i} opacity={opacity}>
+                            <circle 
+                                cx={m.x} cy={m.y} 
+                                r={radius} 
+                                fill="transparent" 
+                                stroke={p.color} 
+                                strokeWidth={1} 
+                                strokeDasharray="2,2"
+                            />
+                            <text 
+                                x={m.x} y={m.y} dy={-radius - 4} 
+                                textAnchor="middle" 
+                                fontSize="8" 
+                                fill={p.color} 
+                                fontFamily="monospace"
+                            >
+                                +{m.t}s
+                            </text>
+                        </g>
+                    );
+                })}
             </g>
           );
       })}
