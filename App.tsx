@@ -374,15 +374,15 @@ export default function App() {
                         
                         {/* Tooltip */}
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-72 bg-slate-900/95 border border-yellow-500/30 p-4 rounded-lg text-xs text-slate-300 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none backdrop-blur-xl">
-                            <h5 className="font-bold text-yellow-400 mb-2 uppercase cyber-font">Kinematic Projection</h5>
+                            <h5 className="font-bold text-yellow-400 mb-2 uppercase cyber-font">Inertial vs. Structural</h5>
                             <p className="mb-2 leading-relaxed">
-                                Ghost particles visualize the network's <strong>forward prediction</strong> (approx. 1 second into the future).
+                                Ghost particles visualize the <strong>inertial trajectory</strong>: where the particle <em>would</em> go if no other forces acted on it.
                             </p>
-                            <div className="bg-black/50 p-2 rounded mb-2 font-mono text-cyan-300 border border-slate-700">
-                                r(t+1) = r + v·t + ½·a·t²
+                            <div className="bg-black/50 p-2 rounded mb-2 font-mono text-cyan-300 border border-slate-700 text-[10px]">
+                                r(t+1) = r(t) + v(t)Δt ... (Integrated)
                             </div>
                             <p className="text-slate-400 italic">
-                                The distance between the solid particle (Reality) and the ghost (Prediction) is the visual representation of <strong>Free Energy</strong>.
+                                The distance between the Ghost (Inertia) and the Real Particle (influenced by neighbors) represents <strong>Prediction Error</strong> (Surprise).
                             </p>
                         </div>
                     </div>

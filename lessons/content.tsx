@@ -330,7 +330,6 @@ export const LESSON_STEPS: LessonStep[] = [
     ]
   },
   
-  // ... (Skipping Steps 6-13 for brevity in this specific update, but they would follow the same pattern) ...
   {
     title: "6. Intrinsic Spin",
     content: (
@@ -565,24 +564,38 @@ export const LESSON_STEPS: LessonStep[] = [
     ]
   },
   
-  // ... (Steps 15-32 generic placeholders for now, but fully functional in app) ...
   {
-    title: "15. Prediction Error",
-    content: <p className="text-xl">The difference between reality and prediction is Error.</p>,
-    config: p({ k: 0.05, eta: 0.05, eta_r: 0 }),
+    title: "15. Prediction Error & Free Energy",
+    content: (
+        <>
+            <p className="mb-8 text-xl md:text-2xl leading-relaxed text-slate-200">
+                The difference between reality (sensory input) and prediction is the <strong>Prediction Error</strong>.
+                Minimizing this value corresponds to minimizing Free Energy.
+            </p>
+        </>
+    ),
+    config: p({ k: 0.05, eta: 0.05, eta_r: 0, showGhosts: true }),
     setup: 'chain',
     symbols: [],
+    questions: [
+         {
+            question: "What creates Prediction Error?",
+            options: ["Difference between prediction and reality.", "Too much electricity.", "The code crashing.", "Particles moving too slow."],
+            correctAnswer: "Difference between prediction and reality."
+        }
+    ]
   },
    {
-    title: "32. Morphogenesis & Communication",
+    title: "16. Morphogenesis & Communication",
     content: (
       <>
         <p className="mb-8 text-xl md:text-2xl leading-relaxed text-slate-200">
            <strong>Morphogenesis</strong> is the biological process that causes an organism to develop its shape.
+           Here, the shape emerges from the collective effort to minimize error.
         </p>
       </>
     ),
-    config: p({ k: 0.1, r0: 100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, temperature: 0.05 }),
+    config: p({ k: 0.1, r0: 100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, temperature: 0.05, showGhosts: true }),
     setup: 'spin_cluster',
     symbols: [],
     questions: [
