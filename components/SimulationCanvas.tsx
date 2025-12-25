@@ -15,7 +15,6 @@ interface SimulationCanvasProps {
 }
 
 // Box-Muller transform for Gaussian noise distribution
-// This provides more realistic Brownian motion than uniform random noise
 const gaussianRandom = () => {
   const u = 1 - Math.random(); 
   const v = Math.random();
@@ -47,11 +46,14 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
   const requestRef = useRef<number>(0);
   const draggingId = useRef<number | null>(null);
-  const mousePosRef = useRef<Vector2>({ x: 0, y: 0 }); // Track mouse pos independently of state
+  const mousePosRef = useRef<Vector2>({ x: 0, y: 0 }); 
   const svgRef = useRef<SVGSVGElement>(null);
   const isDragging = useRef<boolean>(false);
   const particlesRef = useRef(particles);
   const panStartRef = useRef<Vector2 | null>(null);
+  
+  // Trail History: Map<ParticleID, Array<Vector2>>
+  const trailsRef = useRef<Map<number, Vector2[]>>(new Map());
   
   // Prediction Verification System
   const simFrameRef = useRef(0);
@@ -81,7 +83,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       setParticles(initialParticles);
       setInteractions([]);
       setResetAnim(null);
-      // Clear prediction history on reset
+      trailsRef.current.clear();
       predictionHistoryRef.current.clear();
       simFrameRef.current = 0;
     }
@@ -116,7 +118,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
            vel: { x: 0, y: 0 },
            force: { x: 0, y: 0 },
            valVel: 0,
-           phaseVel: 0.1 
+           phaseVel: 0.1,
+           spin: pEnd.spin,
+           color: pEnd.color,
+           id: pEnd.id,
+           phase: pStart.phase
          };
        });
        return { particles: interpolated, interactions: [], energy: { pred: 0, pos: 0 } };
@@ -132,24 +138,35 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     const currentFrame = simFrameRef.current;
     let historyError = 0;
 
+    // Update Trails
+    if (currentFrame % 3 === 0) { // Optimize: only save every 3rd frame
+        currentParticles.forEach(p => {
+            if (!trailsRef.current.has(p.id)) {
+                trailsRef.current.set(p.id, []);
+            }
+            const trail = trailsRef.current.get(p.id)!;
+            trail.push({ ...p.pos });
+            if (trail.length > 20) trail.shift(); // Keep last 20 points
+        });
+    }
+
     if (config.showGhosts) {
-        const PREDICTION_FRAMES = 60; // Check accuracy at 1 second
+        const PREDICTION_FRAMES = 60; // Check accuracy at 1 second (approx 60 frames)
         const targetFrame = currentFrame + PREDICTION_FRAMES;
 
         // 1. Record CURRENT Kinematic predictions for the future (Force-aware & Damped)
         const currentPredictions: Record<number, Vector2> = {};
         currentParticles.forEach(p => {
-             // Instead of a simple formula, we iteratively simulate the particle's motion
-             // to account for damping, which provides a much more accurate prediction.
              let predX = p.pos.x;
              let predY = p.pos.y;
              let predVx = p.vel.x;
              let predVy = p.vel.y;
              
-             // Assume current force remains constant (approximate)
+             // Assume current force remains relatively constant for the immediate timeframe
              const accX = (p.force?.x || 0) * config.eta_r;
              const accY = (p.force?.y || 0) * config.eta_r;
              
+             // Iterative projection
              for(let i = 0; i < PREDICTION_FRAMES; i++) {
                  predVx = predVx * config.damping + accX;
                  predVy = predVy * config.damping + accY;
@@ -175,7 +192,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  }
              });
              if (count > 0) historyError = totalError / count;
-             predictionHistoryRef.current.delete(currentFrame); // Cleanup
+             predictionHistoryRef.current.delete(currentFrame); 
         }
     } else {
         if (predictionHistoryRef.current.size > 0) predictionHistoryRef.current.clear();
@@ -244,7 +261,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const unitY = (p.pos.y - other.pos.y) / d;
         
         // Spin modulation for physical force (Attraction/Repulsion strength)
-        // If spin enabled: Aligned spins -> Stronger bond. Opposite spins -> Weaker bond.
         const spinFactor = config.spinEnabled ? (1 + 2.0 * (p.spin * other.spin)) : 1.0;
         
         const forceMag = -config.k * displacement * spinFactor; 
@@ -268,9 +284,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       const noiseY = gaussianRandom() * config.temperature;
 
       // Apply forces and damping
-      // Velocity Verlet-ish integration with separated damping (Langevin-like)
-      // v(t+1) = v(t) * damping + Force + Noise
-      // This preserves momentum slightly better than applying damping to the sum
       let newVelX = p.vel.x * config.damping + (forcePos.x * config.eta_r) + noiseX;
       let newVelY = p.vel.y * config.damping + (forcePos.y * config.eta_r) + noiseY;
       
@@ -424,6 +437,28 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           );
       })}
 
+      {/* Particle Trails */}
+      {particles.map(p => {
+          const trail = trailsRef.current.get(p.id) || [];
+          if (trail.length < 2) return null;
+          
+          let d = `M ${trail[0].x} ${trail[0].y}`;
+          for (let i=1; i<trail.length; i++) {
+              d += ` L ${trail[i].x} ${trail[i].y}`;
+          }
+
+          return (
+              <path 
+                key={`trail-${p.id}`}
+                d={d}
+                stroke={p.color}
+                strokeWidth={1}
+                fill="none"
+                opacity={0.3}
+              />
+          );
+      })}
+
       {/* Ghost Particles (Future Prediction) */}
       {config.showGhosts && particles.map(p => {
           const accX = (p.force?.x || 0) * config.eta_r;
@@ -442,6 +477,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
           for (let f = 1; f <= 300; f++) {
               // Apply physics logic matching main loop
+              // Note: Noise is not added here as prediction assumes deterministic evolution (or mean of dist)
               simVx = simVx * config.damping + accX;
               simVy = simVy * config.damping + accY;
               simX += simVx;

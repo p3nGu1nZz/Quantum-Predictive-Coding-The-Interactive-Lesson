@@ -27,7 +27,7 @@ export const LESSON_STEPS: LessonStep[] = [
     setup: 'swarm',
     symbols: [],
     explanation: (
-      <div className="space-y-8">
+      <div className="space-y-8 text-lg">
         <div className="border-l-4 border-cyan-500 pl-6">
             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Concept Overview</h4>
             <p>
@@ -94,7 +94,7 @@ export const LESSON_STEPS: LessonStep[] = [
     setup: 'random',
     symbols: [],
     explanation: (
-      <div className="space-y-8">
+      <div className="space-y-8 text-lg">
          <div className="border-l-4 border-purple-500 pl-6">
             <h4 className="text-2xl font-bold text-purple-400 mb-2 cyber-font">The Free Energy Principle (FEP)</h4>
             <p>
@@ -162,7 +162,7 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "\\mathbb{R}^3", definition: "3D Real Space", context: "The physical cavity dimensions." }
     ],
     explanation: (
-      <div className="space-y-8">
+      <div className="space-y-8 text-lg">
          <div className="border-l-4 border-blue-500 pl-6">
             <h4 className="text-2xl font-bold text-blue-400 mb-2 cyber-font">Vector Space Representation</h4>
             <p>
@@ -221,7 +221,7 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "\\mathbb{R}", definition: "Real Numbers", context: "The set of all possible activation values." }
     ],
     explanation: (
-      <div className="space-y-8">
+      <div className="space-y-8 text-lg">
          <div className="border-l-4 border-yellow-500 pl-6">
             <h4 className="text-2xl font-bold text-yellow-400 mb-2 cyber-font">The "Thought" Variable</h4>
             <p>
@@ -283,7 +283,7 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "t", definition: "Time", context: "The temporal dimension of evolution." }
     ],
     explanation: (
-      <div className="space-y-8">
+      <div className="space-y-8 text-lg">
          <div className="border-l-4 border-purple-500 pl-6">
             <h4 className="text-2xl font-bold text-purple-400 mb-2 cyber-font">Temporal Binding & Synchrony</h4>
             <p>
@@ -348,9 +348,28 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "s_i", definition: "Intrinsic Spin", context: "Quantum property taking values {-1/2, +1/2}." }
     ],
     explanation: (
-      <div className="space-y-8">
-        <h4 className="text-2xl font-bold text-emerald-400 mb-2 cyber-font">Interaction Channels</h4>
-        <p>Intrinsic Spin allows for selective interaction based on particle type.</p>
+      <div className="space-y-8 text-lg">
+        <div className="border-l-4 border-emerald-500 pl-6">
+             <h4 className="text-2xl font-bold text-emerald-400 mb-2 cyber-font">Quantum Channel Selectivity</h4>
+             <p>
+                Just as phase separates signals in time, Spin separates them in "Type". 
+                You can think of Spin as a distinct flavor of the particle.
+             </p>
+        </div>
+        <div>
+             <h5 className="text-xl font-bold text-slate-200 mb-3 border-b border-slate-700 pb-2">The Pauli Exclusion Analogy</h5>
+             <p className="mb-4">
+                In physics, fermions with the same quantum numbers cannot occupy the same state (Pauli Exclusion Principle). 
+                Here, we use Spin to define <strong>Interaction Rules</strong>:
+             </p>
+             <ul className="list-disc pl-5 space-y-2 text-slate-300">
+                <li><strong>Parallel Spin (Up/Up):</strong> Cooperative interaction. Strong bonds.</li>
+                <li><strong>Anti-Parallel Spin (Up/Down):</strong> Antagonistic or weak interaction. </li>
+             </ul>
+             <p className="mt-4">
+                This allows the network to segregate into distinct functional clusters (e.g., visual processing vs. auditory processing) even if they are mixed in the same physical space.
+             </p>
+        </div>
       </div>
     ),
     questions: [
@@ -381,9 +400,13 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "L", definition: "Boundary Limit", context: "Maximum size of the system cavity." }
     ],
     explanation: (
-        <div className="space-y-8">
+        <div className="space-y-8 text-lg">
             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">The Boundary Condition</h4>
-            <p>Infinite space prevents pressure build-up. By confining particles, we force interaction.</p>
+            <p>
+                Infinite space prevents pressure build-up. By confining particles, we force interaction.
+                In a biological cell, this is the cell membrane. In a skull, it is the cranium.
+                Without containment, entropy would simply disperse the system into the void. The boundary forces the system to confront its own disorder.
+            </p>
         </div>
     ),
     questions: [
@@ -411,6 +434,16 @@ export const LESSON_STEPS: LessonStep[] = [
     symbols: [
         { symbol: "d_{ij}", definition: "Euclidean Distance", context: "Scalar separation between particle i and j." }
     ],
+    explanation: (
+        <div className="space-y-8 text-lg">
+            <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Local Interaction</h4>
+            <p>
+                In L-Group PCNs, there is no "Action at a Distance". Influence must travel through the medium.
+                The distance <InlineMath math="d_{ij}" /> determines how loud a neighbor sounds. 
+                We use a Gaussian decay function, meaning influence drops off rapidly as distance increases. This creates <strong>Sparse Connectivity</strong> naturally.
+            </p>
+        </div>
+    ),
     questions: [
         {
             question: "How does interaction strength relate to distance?",
@@ -436,6 +469,17 @@ export const LESSON_STEPS: LessonStep[] = [
     symbols: [
         { symbol: "\\mathbf{\\hat{d}}_{ij}", definition: "Unit Vector", context: "Normalized direction of the bond." }
     ],
+    explanation: (
+        <div className="space-y-8 text-lg">
+            <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Vector Normalization</h4>
+            <p>
+               Forces are vectors: they have magnitude and direction.
+               <br/>
+               The Unit Vector <InlineMath math="\mathbf{\hat{d}}_{ij}" /> points from one particle to another with a length of exactly 1.
+               We then multiply this by the force magnitude to tell the particle exactly which way to move.
+            </p>
+        </div>
+    ),
     questions: [
         {
             question: "What does the unit vector provide?",
@@ -461,6 +505,20 @@ export const LESSON_STEPS: LessonStep[] = [
     symbols: [
         { symbol: "V_{ij}", definition: "Interaction Potential", context: "Energy stored in the bond between i and j." }
     ],
+    explanation: (
+        <div className="space-y-8 text-lg">
+            <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Spring Dynamics</h4>
+            <p>
+               Every connection acts like a spring with a "preferred distance" <InlineMath math="r_0" />.
+               <br/><br/>
+               If particles are too close (<InlineMath math="d < r_0" />), they repel.
+               <br/>
+               If they are too far (<InlineMath math="d > r_0" />), they attract.
+               <br/><br/>
+               This simple rule allows complex crystal-like lattices to form automatically.
+            </p>
+        </div>
+    ),
     questions: [
         {
             question: "What physical object is the Harmonic Potential similar to?",
@@ -474,7 +532,19 @@ export const LESSON_STEPS: LessonStep[] = [
     content: <p className="text-xl">The total energy of the system is described by the <strong>Hamiltonian</strong>.</p>,
     config: p({ k: 0.1, r0: 100 }),
     setup: 'chain',
-    symbols: [],
+    symbols: [
+        { symbol: "H", definition: "Hamiltonian", context: "Total Energy (Kinetic + Potential)" }
+    ],
+    explanation: (
+        <div className="space-y-8 text-lg">
+             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">System Energy</h4>
+             <p>
+                 The Hamiltonian <InlineMath math="H" /> sums up every bit of energy in the system.
+                 In our case, it includes the kinetic energy of moving particles and the potential energy stored in the "springs" connecting them.
+                 Nature loves to minimize potential energy while conserving total energy.
+             </p>
+        </div>
+    ),
     questions: [{question: "What represents the total energy?", options: ["Hamiltonian", "Lagrangian", "Newtonian", "Euclidean"], correctAnswer: "Hamiltonian"}]
   },
   {
@@ -482,7 +552,19 @@ export const LESSON_STEPS: LessonStep[] = [
     content: <p className="text-xl">Physical forces are the negative gradient of the potential energy.</p>,
     config: p({ k: 0.1, r0: 100, eta_r: 0.2 }),
     setup: 'random',
-    symbols: [],
+    symbols: [
+         { symbol: "F", definition: "Force", context: "-∇V (Negative Gradient of Potential)" }
+    ],
+    explanation: (
+        <div className="space-y-8 text-lg">
+             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Gradient Descent in Physics</h4>
+             <p>
+                 If you put a ball on a hill, it rolls down. Why? Because the force of gravity points in the direction of the steepest descent of potential energy.
+                 <br/><br/>
+                 Here, we calculate the "Hill" created by prediction errors. The force <InlineMath math="F" /> pushes the particle down this hill towards the solution.
+             </p>
+        </div>
+    ),
     questions: [{question: "Force is the negative gradient of what?", options: ["Potential Energy", "Kinetic Energy", "Mass", "Velocity"], correctAnswer: "Potential Energy"}]
   },
   {
@@ -491,6 +573,15 @@ export const LESSON_STEPS: LessonStep[] = [
     config: p({ k: 0.1, r0: 100, eta_r: 0.2 }),
     setup: 'triangle',
     symbols: [],
+    explanation: (
+        <div className="space-y-8 text-lg">
+             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Conservation of Momentum</h4>
+             <p>
+                 If Particle A pulls on Particle B, Particle B pulls back on A with equal force.
+                 This ensures the system doesn't just drift off into space endlessly; internal forces cancel out, and the center of mass remains stable unless perturbed.
+             </p>
+        </div>
+    ),
   },
 
   // --- CRITICAL STEP: PREDICTION ---
@@ -516,7 +607,7 @@ export const LESSON_STEPS: LessonStep[] = [
         { symbol: "w_{ij}", definition: "Weights", context: "Connection strength from j to i." }
     ],
     explanation: (
-       <div className="space-y-8">
+       <div className="space-y-8 text-lg">
          <div className="border-l-4 border-emerald-500 pl-6">
             <h4 className="text-2xl font-bold text-emerald-400 mb-2 cyber-font">The "Ghost" in the Machine</h4>
             <p>
@@ -541,7 +632,7 @@ export const LESSON_STEPS: LessonStep[] = [
             <p>
                 We have enabled <strong>Ghost Particles</strong> in this step.
                 <br/>
-                The solid particle is where the node IS. The faded ghost is where the node THINKS it will be in 1 second.
+                The solid particle is where the node IS. The faded ghost is where the node THINKS it will be in 1 second based on its current momentum and forces.
             </p>
             <p className="mt-2 text-yellow-400">
                 If the ghost is far away from the particle, the system is unstable (High Kinetic Energy / High Error).
@@ -577,6 +668,22 @@ export const LESSON_STEPS: LessonStep[] = [
     config: p({ k: 0.05, eta: 0.05, eta_r: 0, showGhosts: true }),
     setup: 'chain',
     symbols: [],
+    explanation: (
+        <div className="space-y-8 text-lg">
+             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Error Minimization</h4>
+             <p>
+                 The brain hates being wrong. When Prediction Error is high (Surprise!), the system is in a high-energy state.
+                 It has two choices to fix this:
+             </p>
+             <ol className="list-decimal pl-5 space-y-2 text-slate-300">
+                 <li><strong>Perceptual Inference:</strong> Change its internal state (activations) to match reality.</li>
+                 <li><strong>Active Inference:</strong> Move its physical body to change reality to match the prediction.</li>
+             </ol>
+             <p className="mt-4">
+                 Our simulation does both simultaneously.
+             </p>
+        </div>
+    ),
     questions: [
          {
             question: "What creates Prediction Error?",
@@ -598,6 +705,17 @@ export const LESSON_STEPS: LessonStep[] = [
     config: p({ k: 0.1, r0: 100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, temperature: 0.05, showGhosts: true }),
     setup: 'spin_cluster',
     symbols: [],
+    explanation: (
+        <div className="space-y-8 text-lg">
+             <h4 className="text-2xl font-bold text-cyan-400 mb-2 cyber-font">Emergent Shape</h4>
+             <p>
+                 We didn't program the "shape" of the final network. We only programmed the rules of local interaction.
+                 Yet, complex geometric structures emerge. This is how embryos form, and likely how thoughts form.
+                 <br/><br/>
+                 The system finds the shape that minimizes free energy for the given environment.
+             </p>
+        </div>
+    ),
     questions: [
         {
             question: "What is Morphogenesis?",

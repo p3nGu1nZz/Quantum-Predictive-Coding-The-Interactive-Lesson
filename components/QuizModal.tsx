@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QuizQuestion } from '../types';
-import { CheckCircle, XCircle, BrainCircuit } from 'lucide-react';
+import { CheckCircle, XCircle, BrainCircuit, SkipForward } from 'lucide-react';
 import { COLORS } from '../constants';
 
 interface QuizModalProps {
   questionData: QuizQuestion;
-  onComplete: () => void;
-  onCancel: () => void;
+  onComplete: () => void; // Called on Success
+  onSkip: () => void;     // Called on Skip (Fail)
 }
 
 // Simple particle for the explosion effect
@@ -50,7 +50,7 @@ class ConfettiParticle {
   }
 }
 
-export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, onCancel }) => {
+export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, onSkip }) => {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -174,7 +174,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, 
         {isCorrect === false && (
           <div className="mt-6 text-red-400 font-bold animate-pulse text-center">
              Incorrect. Reviewing protocols...
-             <button onClick={onCancel} className="block mt-2 text-sm text-slate-500 hover:text-white underline mx-auto">Skip Quiz</button>
+             <button onClick={onSkip} className="block mt-2 text-sm text-slate-500 hover:text-white underline mx-auto">Skip Question (Record Failure)</button>
           </div>
         )}
         
@@ -182,6 +182,16 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, 
              <div className="mt-6 text-emerald-400 font-bold animate-bounce text-center uppercase tracking-widest cyber-font">
                 Verification Successful. Proceeding...
              </div>
+        )}
+
+        {/* Skip Button (Only show if not answered yet) */}
+        {selectedAnswer === null && (
+            <button 
+                onClick={onSkip}
+                className="mt-8 text-slate-500 hover:text-red-400 flex items-center gap-2 text-sm uppercase tracking-widest transition-colors"
+            >
+                <SkipForward size={16} /> Skip Verification (Penalty)
+            </button>
         )}
 
       </div>

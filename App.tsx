@@ -4,7 +4,7 @@ import { SymbolTable } from './components/SymbolTable';
 import { QuizModal } from './components/QuizModal'; // Imported
 import { Particle, Interaction, Vector2, QuizQuestion } from './types';
 import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
-import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
+import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2, HelpCircle, History, Award, AlertTriangle, RotateCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { LESSON_STEPS } from './lessons/content';
 import { createParticles } from './lessons/setups';
@@ -24,6 +24,10 @@ export default function App() {
   const [predictionError, setPredictionError] = useState<number | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  // Lesson State
+  const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [showResults, setShowResults] = useState(false);
+
   // Quiz State
   const [quizState, setQuizState] = useState<{
     active: boolean;
@@ -31,13 +35,20 @@ export default function App() {
     targetStep: number;
   }>({ active: false, question: null, targetStep: 0 });
 
-  // Ref to track the LATEST state from the physics engine
+  // Refs
   const latestParticlesRef = useRef<Particle[]>(particles);
-  // Ref to prevent race conditions during add/remove operations
   const isUpdatingRef = useRef(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Safe check for bounds
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
+
+  // Scroll to top when step changes
+  useEffect(() => {
+     if (sidebarRef.current) {
+         sidebarRef.current.scrollTo(0, 0);
+     }
+  }, [stepIndex, showResults]);
 
   // Reset when step changes
   useEffect(() => {
@@ -141,11 +152,16 @@ export default function App() {
 
   // --- Quiz Logic ---
   const attemptNextStep = () => {
-      const nextIndex = Math.min(LESSON_STEPS.length - 1, stepIndex + 1);
+      const nextIndex = stepIndex + 1;
+      
+      // Check if finished
+      if (nextIndex >= LESSON_STEPS.length) {
+          setShowResults(true);
+          return;
+      }
       
       // Check if current step has questions
       if (currentStep.questions && currentStep.questions.length > 0) {
-          // Pick a random question
           const qIndex = Math.floor(Math.random() * currentStep.questions.length);
           const question = currentStep.questions[qIndex];
           setQuizState({
@@ -154,25 +170,35 @@ export default function App() {
               targetStep: nextIndex
           });
       } else {
-          // No quiz, just go
           setStepIndex(nextIndex);
       }
   };
 
-  const handleQuizComplete = () => {
+  const handleQuizResult = (correct: boolean) => {
+      setScore(prev => ({
+          correct: prev.correct + (correct ? 1 : 0),
+          total: prev.total + 1
+      }));
       setQuizState(prev => ({ ...prev, active: false }));
+      
+      // If correct or skipped, we advance.
+      // If we wanted to force correctness, we wouldn't have called this on skip.
+      // But user wants "Skip" button.
       setStepIndex(quizState.targetStep);
   };
 
-  const handleQuizCancel = () => {
-      setQuizState(prev => ({ ...prev, active: false }));
-      // Optional: Don't advance, or advance anyway? Let's advance for UX
-      setStepIndex(quizState.targetStep);
+  const handleRestart = () => {
+      setStepIndex(0);
+      setScore({ correct: 0, total: 0 });
+      setShowResults(false);
+      setHasStarted(false); // Go back to splash? or just step 0? Let's go to Step 0.
+      setHasStarted(true);
   };
 
   const handleJumpToStep = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const idx = parseInt(e.target.value);
       setStepIndex(idx);
+      setShowResults(false);
   };
 
   // --- Splash Screen ---
@@ -261,73 +287,113 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber pb-24">
-           
-           <h3 className="text-3xl md:text-4xl font-bold text-slate-100 cyber-font leading-tight border-b-2 border-cyan-900/50 pb-4">
-            {currentStep.title}
-           </h3>
-           
-           <div className="text-slate-200 text-xl md:text-2xl leading-relaxed font-normal tracking-wide">
-             {currentStep.content}
-           </div>
+        <div 
+            ref={sidebarRef}
+            className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber pb-24"
+        >
+           {showResults ? (
+               <div className="animate-fade-in space-y-8">
+                   <div className="border-b border-slate-700 pb-6">
+                       <h3 className="text-4xl font-bold text-yellow-400 cyber-font mb-2">Sim Complete</h3>
+                       <p className="text-xl text-slate-400">Training module finished.</p>
+                   </div>
+                   
+                   <div className="bg-slate-900/50 p-8 rounded-xl border border-slate-700">
+                       <div className="flex items-center gap-4 mb-6">
+                           <Award size={48} className={score.correct / Math.max(1, score.total) > 0.7 ? "text-emerald-400" : "text-yellow-400"} />
+                           <div>
+                               <div className="text-sm uppercase tracking-widest text-slate-500">Final Efficiency</div>
+                               <div className="text-4xl font-mono font-bold text-white">
+                                   {score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%
+                               </div>
+                           </div>
+                       </div>
+                       
+                       <div className="space-y-2 mb-8">
+                           <div className="flex justify-between text-lg border-b border-slate-800 pb-2">
+                               <span>Correct Predictions</span>
+                               <span className="font-mono text-emerald-400">{score.correct}</span>
+                           </div>
+                           <div className="flex justify-between text-lg border-b border-slate-800 pb-2">
+                               <span>Total Challenges</span>
+                               <span className="font-mono text-white">{score.total}</span>
+                           </div>
+                       </div>
 
-           {/* Learn More Button */}
-           {currentStep.explanation && (
-             <button 
-                onClick={() => setShowLearnMore(true)}
-                className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg flex items-center justify-center gap-2 transition-all group"
-             >
-                <BookOpen size={20} className="group-hover:scale-110 transition-transform"/>
-                <span className="uppercase tracking-widest font-bold text-sm">Open Deep Dive Module</span>
-             </button>
-           )}
-
-           {/* NEW: Symbol Table Component */}
-           <SymbolTable symbols={currentStep.symbols} />
-
-           <div className="pt-8 mt-8 border-t border-slate-800">
-             <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
-                  disabled={stepIndex === 0}
-                  className="px-6 py-4 rounded border border-slate-700 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-3 text-sm uppercase tracking-wider cyber-font"
-                >
-                  <ChevronLeft size={18} /> Prev
-                </button>
-
-                <button 
-                  onClick={attemptNextStep}
-                  disabled={stepIndex === LESSON_STEPS.length - 1}
-                  className="flex-1 px-6 py-4 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-wider cyber-font"
-                >
-                  {stepIndex === LESSON_STEPS.length - 1 ? 'Finish' : 'Next Step'} <ChevronRight size={20} />
-                </button>
-             </div>
-             <div className="text-center mt-4 text-xs font-bold text-slate-600 uppercase tracking-[0.2em] font-mono">
-                Segment {stepIndex + 1} / {LESSON_STEPS.length}
-             </div>
-           </div>
-
-           {/* Real-time Energy Chart */}
-           {stepIndex > 1 && (
-             <div className="mt-10 p-5 bg-black/40 rounded border border-slate-800 shadow-inner">
-               <div className="flex items-center gap-2 mb-3 text-xs text-yellow-500 font-bold uppercase tracking-wider cyber-font">
-                 <Activity size={14} /> System Free Energy
+                       <button 
+                         onClick={handleRestart}
+                         className="w-full py-4 bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-500 text-cyan-400 uppercase tracking-widest font-bold flex items-center justify-center gap-2 transition-all hover:scale-105"
+                        >
+                           <RotateCcw size={20} /> Reboot System
+                       </button>
+                   </div>
                </div>
-               <div className="h-40 w-full rounded p-1 border border-slate-800/50 bg-black/20">
-                 <ResponsiveContainer width="100%" height="100%">
-                   <LineChart data={energyData}>
-                     <YAxis hide domain={['auto', 'auto']} />
-                     <Tooltip 
-                        contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }}
-                        itemStyle={{ color: '#facc15', fontSize: '12px', fontFamily: 'monospace' }}
-                        labelStyle={{ display: 'none' }}
-                     />
-                     <Line type="monotone" dataKey="E" stroke="#facc15" strokeWidth={2} dot={false} isAnimationActive={false} />
-                   </LineChart>
-                 </ResponsiveContainer>
-               </div>
-             </div>
+           ) : (
+             <>
+                <h3 className="text-3xl md:text-4xl font-bold text-slate-100 cyber-font leading-tight border-b-2 border-cyan-900/50 pb-4">
+                    {currentStep.title}
+                </h3>
+                
+                <div className="text-slate-200 text-xl md:text-2xl leading-relaxed font-normal tracking-wide">
+                    {currentStep.content}
+                </div>
+
+                {currentStep.explanation && (
+                    <button 
+                        onClick={() => setShowLearnMore(true)}
+                        className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg flex items-center justify-center gap-2 transition-all group"
+                    >
+                        <BookOpen size={20} className="group-hover:scale-110 transition-transform"/>
+                        <span className="uppercase tracking-widest font-bold text-sm">Open Deep Dive Module</span>
+                    </button>
+                )}
+
+                <SymbolTable symbols={currentStep.symbols} />
+
+                <div className="pt-8 mt-8 border-t border-slate-800">
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
+                            disabled={stepIndex === 0}
+                            className="px-6 py-4 rounded border border-slate-700 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-3 text-sm uppercase tracking-wider cyber-font"
+                        >
+                            <ChevronLeft size={18} /> Prev
+                        </button>
+
+                        <button 
+                            onClick={attemptNextStep}
+                            className="flex-1 px-6 py-4 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-wider cyber-font"
+                        >
+                            {stepIndex === LESSON_STEPS.length - 1 ? 'Finish Lesson' : 'Next Step'} <ChevronRight size={20} />
+                        </button>
+                    </div>
+                    <div className="text-center mt-4 text-xs font-bold text-slate-600 uppercase tracking-[0.2em] font-mono">
+                        Segment {stepIndex + 1} / {LESSON_STEPS.length}
+                    </div>
+                </div>
+
+                {/* Real-time Energy Chart */}
+                {stepIndex > 1 && (
+                    <div className="mt-10 p-5 bg-black/40 rounded border border-slate-800 shadow-inner">
+                    <div className="flex items-center gap-2 mb-3 text-xs text-yellow-500 font-bold uppercase tracking-wider cyber-font">
+                        <Activity size={14} /> System Free Energy
+                    </div>
+                    <div className="h-40 w-full rounded p-1 border border-slate-800/50 bg-black/20">
+                        <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={energyData}>
+                            <YAxis hide domain={['auto', 'auto']} />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }}
+                                itemStyle={{ color: '#facc15', fontSize: '12px', fontFamily: 'monospace' }}
+                                labelStyle={{ display: 'none' }}
+                            />
+                            <Line type="monotone" dataKey="E" stroke="#facc15" strokeWidth={2} dot={false} isAnimationActive={false} />
+                        </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                    </div>
+                )}
+             </>
            )}
         </div>
 
@@ -388,6 +454,23 @@ export default function App() {
                     </div>
                 </div>
             </div>
+        )}
+        
+        {/* Persistent Explanation Box when Ghosts are enabled */}
+        {currentStep.config.showGhosts && (
+             <div className="absolute bottom-6 right-6 w-80 bg-slate-900/80 backdrop-blur-md rounded border border-yellow-500/30 shadow-2xl z-20 p-5 pointer-events-none">
+                 <div className="flex items-center gap-2 mb-2 text-yellow-500">
+                    <History size={18} />
+                    <span className="text-sm font-bold uppercase tracking-widest cyber-font">Trajectory Analysis</span>
+                 </div>
+                 <p className="text-xs text-slate-300 leading-relaxed">
+                    <strong>Faded Lines:</strong> Past movement history.
+                    <br/>
+                    <strong>Dotted Circles:</strong> Future state prediction (Inertia).
+                    <br/>
+                    The system tries to minimize the gap between the predicted future (ghosts) and the actual position required by the network structure.
+                 </p>
+             </div>
         )}
 
         {/* Overlay Controls */}
@@ -462,8 +545,8 @@ export default function App() {
         {quizState.active && quizState.question && (
             <QuizModal 
                 questionData={quizState.question}
-                onComplete={handleQuizComplete}
-                onCancel={handleQuizCancel}
+                onComplete={() => handleQuizResult(true)}
+                onSkip={() => handleQuizResult(false)}
             />
         )}
 
