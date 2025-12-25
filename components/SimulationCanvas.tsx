@@ -138,15 +138,15 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     const currentFrame = simFrameRef.current;
     let historyError = 0;
 
-    // Update Trails
-    if (currentFrame % 3 === 0) { // Optimize: only save every 3rd frame
+    // Update Trails - Record positions
+    if (currentFrame % 2 === 0) { // Record every 2 frames for smoother trails
         currentParticles.forEach(p => {
             if (!trailsRef.current.has(p.id)) {
                 trailsRef.current.set(p.id, []);
             }
             const trail = trailsRef.current.get(p.id)!;
             trail.push({ ...p.pos });
-            if (trail.length > 20) trail.shift(); // Keep last 20 points
+            if (trail.length > 25) trail.shift(); // Keep last 25 points
         });
     }
 
@@ -437,25 +437,31 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           );
       })}
 
-      {/* Particle Trails */}
+      {/* Fading Particle Trails */}
       {particles.map(p => {
           const trail = trailsRef.current.get(p.id) || [];
           if (trail.length < 2) return null;
           
-          let d = `M ${trail[0].x} ${trail[0].y}`;
-          for (let i=1; i<trail.length; i++) {
-              d += ` L ${trail[i].x} ${trail[i].y}`;
-          }
-
+          // Draw trail as segments to allow for gradient fading
           return (
-              <path 
-                key={`trail-${p.id}`}
-                d={d}
-                stroke={p.color}
-                strokeWidth={1}
-                fill="none"
-                opacity={0.3}
-              />
+            <g key={`trail-${p.id}`} className="pointer-events-none">
+              {trail.map((point, index) => {
+                 if (index === 0) return null;
+                 const prev = trail[index - 1];
+                 // Opacity increases towards the current position
+                 const opacity = (index / trail.length) * 0.4; 
+                 return (
+                   <line 
+                     key={index}
+                     x1={prev.x} y1={prev.y}
+                     x2={point.x} y2={point.y}
+                     stroke={p.color}
+                     strokeWidth={1.5}
+                     strokeOpacity={opacity}
+                   />
+                 );
+              })}
+            </g>
           );
       })}
 
@@ -477,7 +483,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
           for (let f = 1; f <= 300; f++) {
               // Apply physics logic matching main loop
-              // Note: Noise is not added here as prediction assumes deterministic evolution (or mean of dist)
               simVx = simVx * config.damping + accX;
               simVy = simVy * config.damping + accY;
               simX += simVx;
