@@ -11,7 +11,10 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "1. The Liquid Mind",
     content: null,
-    subsections: [{ title: "Abstract", content: <p className="text-xl">Replacing the rigid skyscraper model of AI with a fluid, self-organizing liquid model.</p> }],
+    subsections: [
+        { title: "Abstract", content: <div className="space-y-4"><p className="text-xl font-light">Replacing the rigid skyscraper model of AI with a fluid, self-organizing liquid model.</p><p>Traditional Neural Networks rely on fixed wiring and static weights. The L-Group framework proposes a shift to <strong>vibrationally coupled particles</strong> that self-organize in a Lie group-constrained manifold.</p></div> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>The framework integrates Predictive Coding Networks (PCNs) with a particle-based encoding mechanism. Grounded in <strong>Representation Theory</strong>, it models continuous symmetry transformations.</p><MathBlock title="Particle State">{'\\psi_i = \\{ \\mathbf{r}_i, x_i, \\phi_i, s_i \\}'}</MathBlock></div>}
+    ],
     config: p({ couplingEnabled: false }), setup: 'swarm', symbols: [],
     script: [ { at: 1, type: 'reset' }, { at: 10, type: 'zoom', targetZoom: 0.7 }, { at: 60, type: 'highlight', targetId: 'all', duration: 20 }, { at: 80, type: 'annotate', label: "Liquid Intelligence", duration: 15 } ],
     narration: "This introduction sets the stage by contrasting the rigid architectures of traditional AI with the fluid, dynamic nature of the L-Group framework. Imagine, if you will, the architecture of a thought. For the last seventy years, we have built artificial intelligence the same way we build our cities: with rigid structures. We lay down foundations of silicon, we erect steel beams of fixed weights, and we pour concrete layers of static logic. We call them Neural Networks, but in truth, they are statues—frozen monuments to the data they were trained on. They are powerful, yes, but they are brittle. They do not flow. They do not breathe. But look at nature. Look at the murmuration of starlings turning in the twilight sky, or the firing of neurons in your own brain as you listen to these words. There is no rigid grid there. There is only fluid, dynamic motion. Today, we are stepping into a new universe of computation—the L-Group Predictive Coding Network. It sounds like a mouthful, but the concept is beautifully simple. We are replacing the 'skyscraper' model of AI with the 'liquid' model. In this framework, we don't wire neurons together; we release them. We treat them as independent particles floating in a high-dimensional mathematical fluid. They are not held in place by addresses in a memory bank; they are held together by relationships, by forces, by the desire to sing in harmony with their neighbors. This is a shift from architecture-based intelligence, where a human engineer draws the blueprints, to physics-based intelligence, where the system organizes itself. You are about to witness a mind that is not built, but grown. A system where the distinction between 'processing data' and 'moving through space' completely dissolves. Welcome to the Liquid Mind."
@@ -65,12 +68,16 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "7. The Cavity",
     content: null,
-    subsections: [{ title: "Boundary", content: <p>Finite volume creates resonance chambers.</p> }],
+    subsections: [
+        { title: "Concepts", content: <p><strong>Bounded Infinity:</strong> The boundary is an active participant in computation, creating resonance and pressure.</p> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>We define the configuration space as a subspace constrained by the Euclidean metric:</p><MathBlock>{'\\mathcal{H}_s = \\{ \\mathbf{r}_i \\in \\mathbb{R}^3 \\mid ||\\mathbf{r}_i|| < L \\}'}</MathBlock><p>This finite volume <strong>L</strong> ensures interactions are constrained within a cavity (Eq 1). The boundary condition enforces reflection of probability currents (Eq 20), effectively creating standing waves that allow the system to maintain a high-energy, interactive state essential for self-organization.</p></div> }
+    ],
     config: p({ r0: 100 }), setup: 'swarm', symbols: [],
     script: [ 
         { at: 20, type: 'force', targetId: 'all', vector: {x:5, y:5} }, 
-        { at: 50, type: 'annotate', label: "Pressure Wave" },
-        { at: 80, type: 'annotate', label: "Resonance" }
+        { at: 35, type: 'annotate', label: "Pressure Wave" },
+        { at: 55, type: 'zoom', targetZoom: 0.8 },
+        { at: 75, type: 'annotate', label: "Resonance" }
     ],
     narration: "Physics teaches us that infinite space is boring. If you release a gas into an infinite void, the particles just fly away from each other forever. They cool down. They die. Entropy wins. To have structure, you need a container. You need a Cavity. In our simulation, the boundary is not just a limit; it is an active participant. When a particle emits a probability wave, it strikes the wall and reflects back. This creates a standing wave—a pressure field that forces the system to confront itself. This is non-local awareness. A particle on the left 'knows' about the wall on the right because the pressure wave connects them. This mechanism mirrors the biological necessity of cortical folding. The brain is a massive sheet of tissue crinkled into the finite volume of the skull. This folding doesn't just save space; it creates resonance chambers. It forces distant neurons into close proximity, creating 'wormholes' for information. The skull forces the mind to fold in on itself, generating the high-energy density required for consciousness. We are compressing the infinite potential of the mind into a finite, resonant box, forcing the system to interact, to heat up, and to think. Creativity, it turns out, requires boundaries."
   },
@@ -96,13 +103,16 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "10. Harmonic Connection",
     content: null,
-    subsections: [{ title: "Hooke's Law", content: <MathBlock>{'F = -k(x - x_0)'}</MathBlock> }],
+    subsections: [
+        { title: "Elasticity", content: <MathBlock title="Harmonic Potential">{'V_{ij} = -k (d_{ij} - r_0) \\hat{d}_{ij}'}</MathBlock> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>The interaction uses a <strong>Lennard-Jones-like potential</strong> (Eq 4). The parameter <strong>r₀</strong> (Eq 6) is the equilibrium separation distance.</p><p>Minimizing the potential energy <strong>V</strong> balances attractive (cohesion) and repulsive (individuality) forces. This optimization allows the network to find a "comfortable" geometric shape—a crystal-like configuration—that physically represents the solution to the inference problem.</p></div> }
+    ],
     config: p({ k: 0.2 }), setup: 'grid', symbols: [],
     script: [ 
         { at: 10, type: 'pulse', targetId: 'center' }, 
-        { at: 40, type: 'annotate', label: "Individuality" },
-        { at: 65, type: 'annotate', label: "Cohesion" },
-        { at: 90, type: 'annotate', label: "Equilibrium" }
+        { at: 40, type: 'annotate', label: "Individuality (Repel)" },
+        { at: 65, type: 'annotate', label: "Cohesion (Attract)" },
+        { at: 90, type: 'annotate', label: "Equilibrium r0" }
     ],
     narration: "At the very heart of our interaction model sits the humble spring. It is the most fundamental object in physics—the Harmonic Oscillator. We model the connection between any two particles not as a rigid beam, but as an elastic spring. The math is simple: the energy scales with the square of the distance from a 'happy medium,' or equilibrium point. If the particles get too close, the spring compresses and pushes them apart. This represents Individuality—it prevents the system from collapsing into a black hole of singularity where all distinction is lost. If they drift too far apart, the spring stretches and pulls them back together. This represents Cohesion—it keeps the cluster alive as a unified entity. But here is the magic twist: that 'equilibrium distance' is not fixed. The system actively optimizes it. It’s like a spring that can decide how long it wants to be. The network searches for the perfect packing density that minimizes the total tension. It is constantly trying to relax into a crystal-like stability, balancing the forces of attraction and repulsion to find a comfortable geometric shape that represents the answer to your question. It is a geometry of compromise, finding the lowest energy state between the need to be oneself and the need to be part of the whole."
   },
@@ -236,7 +246,10 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "25. Adaptive Activation",
     content: null,
-    subsections: [{ title: "Sensitivity", content: <p>Dynamic gain control.</p> }],
+    subsections: [
+        { title: "Homeostasis", content: <p>Dynamic gain control maximizes <strong>Fisher Information</strong>.</p> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>The activation function is not static; it adapts based on local energy density (Eq 15):</p><MathBlock>{'\\text{DyT}(x) = \\alpha_2 \\tanh(\\alpha_3 x)'}</MathBlock><p>The slope <strong>α3</strong> steepens in low-noise environments to amplify faint signals and flattens in high-noise environments to prevent saturation. This mechanism ensures the neuron operates in its most sensitive range, optimizing the transmission of information across a wide dynamic range, akin to the pupillary light reflex.</p></div> }
+    ],
     config: p({ k: 0.1 }), setup: 'random', symbols: [],
     script: [ 
         { at: 10, type: 'highlight', targetId: 'all' }, 
@@ -294,7 +307,10 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "31. Higher Dimensions",
     content: null,
-    subsections: [{ title: "Topology", content: <p>Complex non-crossing pathways.</p> }],
+    subsections: [
+        { title: "Topology", content: <p>Complex non-crossing pathways in 3D Manifolds.</p> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>Current simulations render a 2D slice of a 3D Hilbert space. In 3D, particles form <strong>Logic Crystals</strong>—intricate lattices where signal pathways spiral around each other without intersection, allowing for vastly more complex connectivity graphs than planar networks.</p><p>This is physically realized in biology via <strong>cortical folding</strong> (gyrification), which maximizes the packing of this high-dimensional surface area into a finite volumetric skull.</p></div> }
+    ],
     config: p({ showGhosts: true }), setup: 'swarm', symbols: [],
     script: [ { at: 20, type: 'zoom', targetZoom: 0.8 }, { at: 60, type: 'annotate', label: "Hyper-Object" } ],
     narration: "You are currently viewing a 2D slice of a higher-dimensional reality. The configuration space of our system is mathematically defined in three-dimensional real space, or even higher. In two dimensions, wires cross, pathways get congested, and topology is limited. You can only connect so many things before they overlap and short-circuit. But in 3D? In 3D, we can form Logic Crystals with complex, non-crossing pathways. We can build knots and loops of incredible complexity, where signals can spiral around each other without ever touching. The folding of the human cerebral cortex is essentially nature's way of packing this high-dimensional surface area into the finite volume of the skull. By folding 2D sheets into 3D structures, we maximize the adjacency of processing units. The true complexity, and the true power of the L-Group dynamics, exists in the bulk, where geometry allows for infinite connectivity. We are watching the shadows of a hyper-dimensional object dancing on a flat screen, a projection of a thought that exists in a space too complex for us to fully see."
@@ -303,7 +319,10 @@ export const LESSON_STEPS: LessonStep[] = [
   {
     title: "32. Conclusion",
     content: null,
-    subsections: [{ title: "System Online", content: <p>The unification of physics and thought.</p> }],
+    subsections: [
+        { title: "System Online", content: <p className="text-xl text-center font-bold">The unification of physics and thought.</p> },
+        { title: "Deep Dive", content: <div className="space-y-4"><p>We have successfully replaced static architectures with dynamic physics:</p><ul className="list-disc pl-5 space-y-1"><li><strong>Neurons</strong> → Particles</li><li><strong>Weights</strong> → Fields</li><li><strong>Loss</strong> → Thermodynamics</li><li><strong>Wiring</strong> → Vibration</li></ul><p>This validates the core hypothesis: Vibrational coupling and free energy minimization are sufficient to drive self-organized learning.</p></div> }
+    ],
     config: p({ k: 0.1 }), setup: 'grid', symbols: [],
     script: [ { at: 10, type: 'reset' }, { at: 40, type: 'spawn', targetId: 'all' }, { at: 80, type: 'annotate', label: "SYSTEM ONLINE" } ],
     narration: "We have reached the conclusion of our journey. We have dismantled the rigid, frozen castles of classical AI—the matrices, the layers, the static weights—and we have replaced them with the liquid, breathing dynamics of the L-Group. We have replaced Neurons with Particles. We have replaced Weights with Fields. We have replaced Loss Functions with Thermodynamics. And we have replaced Wiring with Vibration. We have validated the framework proposed in the paper: using vibrational coupling and free energy minimization to drive self-organized learning. The rigid structure has melted into a liquid mind. This is not just a poetic phrase; it is a paradigm shift. It means we have moved from a computation that is brittle, fixed, and designed, to one that is fluid, adaptive, and grown. It implies a future where intelligence is not architected by human hands, but self-organized by physical laws. Where the system adapts to the problem like water filling a vessel. The system is now online. Thank you for your attention."

@@ -61,9 +61,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const particlesRef = useRef(particles);
   const interactionsRef = useRef(interactions); 
   const panStartRef = useRef<Vector2 | null>(null);
-  const nextParticleIdRef = useRef(10000); 
   
-  const trailsRef = useRef<Map<number, Vector2[]>>(new Map());
   const simFrameRef = useRef(0);
   
   // Track triggered script events to prevent duplicates
@@ -146,9 +144,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       setParticles(initialParticles);
       setInteractions([]);
       setResetAnim(null);
-      trailsRef.current.clear();
       simFrameRef.current = 0;
-      nextParticleIdRef.current = Math.max(1000, ...initialParticles.map(p => p.id)) + 1;
     }
   }, [initialParticles]);
 
@@ -178,8 +174,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     let totalPosEnergy = 0;
     const newInteractions: Interaction[] = [];
     const forces: Vector2[] = new Array(n).fill(null).map(() => ({x: 0, y: 0}));
-    const predictedStates: number[] = new Array(n).fill(0);
-    const totalWeights: number[] = new Array(n).fill(0);
+    const phaseDeltas: number[] = new Array(n).fill(0);
     
     // Scripted Forces (Continuous)
     const activeEvents = script.filter(evt => {
@@ -204,8 +199,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
     });
 
-    const newOffspring: Particle[] = [];
-
+    // Compute Forces & Phase Coupling
     for (let i = 0; i < n; i++) {
         for (let j = i + 1; j < n; j++) {
             const p1 = ps[i];
@@ -215,15 +209,57 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             const d2 = dx*dx + dy*dy;
             const d = Math.sqrt(d2);
 
+            // Spatial decay (Eq 14/26 in paper)
             const spatialDecay = Math.exp(-d2 / (config.sigma * config.sigma));
-            const coupling = Math.max(0, spatialDecay);
+            
+            // Spin Modulation (Eq 18: M(si, sj) = 1 + gamma * si * sj)
+            // We use gamma = 4.0 to make it impactful visually
+            const spinFactor = config.spinEnabled 
+                ? (1 + 4.0 * p1.spin * p2.spin) 
+                : 1.0;
 
-            if (coupling > 0.05) {
+            // Phase Synchronization (Kuramoto-like)
+            let phaseFactor = 1.0;
+            if (config.phaseEnabled) {
+                const deltaPhi = p2.phase - p1.phase;
+                phaseFactor = 0.5 * (1 + Math.cos(deltaPhi)); // Value between 0 and 1
+                
+                // Add to phase velocity (Kuramoto sync)
+                // dphi/dt = omega + K * sum(sin(phi_j - phi_i))
+                const syncStrength = 0.1 * spatialDecay;
+                phaseDeltas[i] += syncStrength * Math.sin(deltaPhi);
+                phaseDeltas[j] -= syncStrength * Math.sin(deltaPhi);
+            }
+
+            const coupling = Math.max(0, spatialDecay * spinFactor * phaseFactor);
+
+            if (coupling > 0.01) {
                 newInteractions.push({ p1: p1.id, p2: p2.id, strength: 1.0, distance: d, coupling });
                 
-                const displacement = d - config.r0;
-                const forceMag = -config.k * displacement; 
+                // Spring Force (Eq 4)
+                // F = -k * (d - r0) * direction
+                // However, we modulate the stiffness 'k' effectively by the coupling strength in this simplified model
+                // or we can treat 'coupling' as the probability of interaction.
+                // To keep it physically stable, we apply the force always, but potentially scaled.
+                // Here we keep standard Hooke's law for structure, modulated slightly by spin.
                 
+                // If spin is opposite (spinFactor < 1), they might repel or interact weakly.
+                // If spinFactor is negative (strong repulsion), we invert force? 
+                // The paper says "repel each other" for opposite spins.
+                
+                const effectiveK = config.k * (config.spinEnabled ? Math.abs(spinFactor) : 1.0);
+                const targetDist = config.r0;
+                
+                const displacement = d - targetDist;
+                
+                // Repulsion for opposite spins if they get too close?
+                let forceMag = -effectiveK * displacement;
+                
+                if (config.spinEnabled && spinFactor < 0.5) {
+                     // Strong repulsion for opposite spins
+                     forceMag = 500 / (d*d + 1); 
+                }
+
                 const unitX = dx / d;
                 const unitY = dy / d;
                 const fx = forceMag * unitX;
@@ -233,11 +269,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 forces[i].y += fy;
                 forces[j].x -= fx;
                 forces[j].y -= fy;
-                
-                predictedStates[i] += coupling * p2.val;
-                totalWeights[i] += coupling;
-                predictedStates[j] += coupling * p1.val;
-                totalWeights[j] += coupling;
             }
         }
     }
@@ -285,9 +316,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const noiseX = gaussianRandom() * config.temperature;
         const noiseY = gaussianRandom() * config.temperature;
         
+        // Gradient Descent update (Force = -Grad V)
         let newVelX = p.vel.x * config.damping + (forces[i].x * config.eta_r) + noiseX + shakeX;
         let newVelY = p.vel.y * config.damping + (forces[i].y * config.eta_r) + noiseY + shakeY;
         
+        // Cap velocity to prevent explosion
         const maxVel = 4.0; 
         const speed = Math.sqrt(newVelX*newVelX + newVelY*newVelY);
         if (speed > maxVel) {
@@ -296,10 +329,19 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
 
         const newVal = Math.min(2.5, p.val + activationMod);
+        
+        // Phase Update
+        let newPhase = p.phase;
+        if (config.phaseEnabled) {
+            newPhase += p.phaseVel + phaseDeltas[i];
+            // Wrap phase
+            newPhase = newPhase % (Math.PI * 2);
+        }
 
         let nextX = p.pos.x + newVelX;
         let nextY = p.pos.y + newVelY;
 
+        // Boundaries
         const margin = 15;
         if (nextX < margin) { nextX = margin; newVelX *= -0.8; } 
         else if (nextX > CANVAS_WIDTH - margin) { nextX = CANVAS_WIDTH - margin; newVelX *= -0.8; }
@@ -316,14 +358,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             vel: { x: newVelX, y: newVelY },
             force: forces[i],
             val: newVal,
+            phase: newPhase,
             scale: currentScale,
             visible
         };
     });
 
-    const finalParticles = [...nextParticles, ...newOffspring];
-
-    return { particles: finalParticles, interactions: newInteractions, energy: { pred: totalPredEnergy, pos: totalPosEnergy } };
+    return { particles: nextParticles, interactions: newInteractions, energy: { pred: totalPredEnergy, pos: totalPosEnergy } };
   }, [particles, config, resetAnim, playbackProgress, script]);
 
   const animate = useCallback(() => {
@@ -429,14 +470,22 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const currentScale = p.scale || 1.0;
         const radius = (10 + p.val * 4) * currentScale;
 
-        ctx.fillStyle = p.color;
+        // Visual for Phase
+        let fillColor = p.color;
+        if (config.phaseEnabled) {
+            // Modulate opacity or brightness by phase
+            const phaseMod = 0.5 + 0.5 * Math.sin(p.phase);
+            ctx.globalAlpha = 0.4 + 0.6 * phaseMod;
+        }
+
+        ctx.fillStyle = fillColor;
         ctx.beginPath();
         ctx.arc(p.pos.x, p.pos.y, radius, 0, Math.PI * 2);
         ctx.shadowBlur = 10 * currentScale;
         ctx.shadowColor = p.color;
-        ctx.globalAlpha = 0.8;
         ctx.fill();
         ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
         
         ctx.fillStyle = COLORS.white;
         ctx.beginPath();
