@@ -182,16 +182,12 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 totalWeights[j] += w_ij;
 
                 // Force Accumulation
-                // Force derivation: F = -k(d - r0) * direction
-                // displacement > 0 means d > r0 (stretched), force should be attractive (pull together)
-                // displacement < 0 means d < r0 (compressed), force should be repulsive (push apart)
                 const displacement = d - config.r0;
                 
                 // Spin can modulate the effective force strength
                 const spinGammaForce = 6.0;
                 const spinFactor = config.spinEnabled ? (1 + spinGammaForce * spinProduct) : 1.0;
                 
-                // Force magnitude: -k * displacement
                 const forceMag = -config.k * displacement * spinFactor; 
                 
                 totalPosEnergy += 0.5 * config.k * (displacement ** 2);
@@ -225,10 +221,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         // Trail Logic
         if (!trailsRef.current.has(p.id)) trailsRef.current.set(p.id, []);
         const trail = trailsRef.current.get(p.id)!;
+        
+        // Add point if moved enough or periodically
         const last = trail[trail.length - 1];
-        if (!last || Math.abs(last.x - p.pos.x) > 0.5 || Math.abs(last.y - p.pos.y) > 0.5) {
+        if (!last || Math.abs(last.x - p.pos.x) > 1.0 || Math.abs(last.y - p.pos.y) > 1.0) {
             trail.push({ ...p.pos });
-            if (trail.length > 50) trail.shift();
+            // Keep trails relatively short for performance, but long enough for visuals
+            if (trail.length > 25) trail.shift();
         }
 
         // Dragging
@@ -256,7 +255,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         let newVelY = p.vel.y * config.damping + (forces[i].y * config.eta_r) + noiseY;
         
         // --- STABILIZATION: CLAMP VELOCITY ---
-        const maxVel = 5.0; // Terminal velocity limit to prevent explosion
+        const maxVel = 5.0; 
         const speed = Math.sqrt(newVelX*newVelX + newVelY*newVelY);
         if (speed > maxVel) {
             newVelX = (newVelX / speed) * maxVel;
@@ -292,8 +291,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     // Ghosts
     if (config.showGhosts) {
-        // We use simple linear projection for the ghost markers visually
-        // but keep the history logic for error metric calculation
         const targetFrame = currentFrame + 60;
         predictionHistoryRef.current.set(targetFrame, nextParticles.reduce((acc, p) => ({...acc, [p.id]: p.pos}), {}));
         const past = predictionHistoryRef.current.get(currentFrame);
@@ -391,22 +388,23 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              if (config.spinEnabled) {
                  // Parallel spins (0.25) vs Anti-parallel (-0.25)
                  const spinProd = p1.spin * p2.spin;
+                 // Note: spins are +/- 0.5. product is +0.25 (parallel) or -0.25 (anti)
                  const isAligned = spinProd > 0;
                  
                  if (isAligned) {
-                     // Strong attractive bond
-                     ctx.strokeStyle = '#10b981'; // Green
+                     // Strong attractive bond - Solid Green
+                     ctx.strokeStyle = COLORS.green;
                      ctx.lineWidth = 1.5 + 2 * opacity;
                      ctx.setLineDash([]);
                  } else {
-                     // Repulsive/Weak bond
-                     ctx.strokeStyle = '#f97316'; // Orange
+                     // Repulsive/Weak bond - Dashed Orange
+                     ctx.strokeStyle = COLORS.orange;
                      ctx.lineWidth = 1 + opacity;
-                     ctx.setLineDash([5, 5]); // Dashed for repulsion/conflict
+                     ctx.setLineDash([4, 6]); // Visual indicator for spin-spin repulsion
                  }
              } else {
                  // Standard Mode
-                 ctx.strokeStyle = '#d946ef'; // COLORS.purple
+                 ctx.strokeStyle = COLORS.purple;
                  ctx.lineWidth = 1 + 2 * opacity;
                  if (opacity < 0.3) {
                      ctx.setLineDash([4, 4]); 
@@ -425,56 +423,80 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.lineJoin = 'round';
 
     particles.forEach(p => {
-        // Ghost Particles (Future Prediction)
+        // Ghost Particles (Future Prediction) with Physics Simulation
         if (config.showGhosts) {
-             // Linear extrapolation for visual effect (1s, 3s, 5s at 60fps)
-             const offsets = [60, 180, 300]; 
-             offsets.forEach((frames, idx) => {
-                 const t = frames; // time steps
-                 // Simple linear projection x = x0 + v*t (ignoring force for visual clarity/stability)
-                 const gx = p.pos.x + p.vel.x * frames;
-                 const gy = p.pos.y + p.vel.y * frames;
+             // Simulate trajectory for this particle
+             const simSteps = 30;
+             let simPos = { ...p.pos };
+             let simVel = { ...p.vel };
+             
+             ctx.beginPath();
+             ctx.moveTo(simPos.x, simPos.y);
+             
+             for(let i=0; i<simSteps; i++) {
+                 // Apply damping
+                 simVel.x *= config.damping;
+                 simVel.y *= config.damping;
+                 // Apply current instantaneous force (approximate field)
+                 simVel.x += p.force.x * config.eta_r;
+                 simVel.y += p.force.y * config.eta_r;
                  
-                 // Pulsing alpha
-                 const pulse = 0.5 + 0.5 * Math.sin(time * 0.003 - idx);
-                 const alpha = (0.3 - idx * 0.08) * pulse; // Fade out further predictions
-
-                 if (alpha > 0.05) {
-                     ctx.save();
-                     ctx.translate(gx, gy);
-                     ctx.fillStyle = COLORS.yellow;
-                     ctx.globalAlpha = alpha;
-                     ctx.beginPath();
-                     ctx.arc(0, 0, 4 + (2-idx), 0, Math.PI * 2);
-                     ctx.fill();
-                     
-                     // Dashed line to ghost
-                     if (idx === 0) {
-                         ctx.beginPath();
-                         ctx.moveTo(p.pos.x - gx, p.pos.y - gy); // relative back to particle
-                         ctx.lineTo(0, 0);
-                         ctx.strokeStyle = COLORS.yellow;
-                         ctx.lineWidth = 1;
-                         ctx.setLineDash([2, 4]);
-                         ctx.stroke();
-                     }
-                     ctx.restore();
+                 simPos.x += simVel.x;
+                 simPos.y += simVel.y;
+                 
+                 if (i % 5 === 0) { // Draw dots every few steps
+                     ctx.lineTo(simPos.x, simPos.y);
                  }
-             });
+             }
+             ctx.strokeStyle = COLORS.yellow;
+             ctx.lineWidth = 1;
+             ctx.setLineDash([2, 4]);
+             ctx.globalAlpha = 0.4;
+             ctx.stroke();
+             ctx.setLineDash([]);
+             
+             // Draw final ghost head
+             ctx.beginPath();
+             ctx.arc(simPos.x, simPos.y, 3, 0, Math.PI*2);
+             ctx.fillStyle = COLORS.yellow;
+             ctx.fill();
         }
 
-        // Trail
+        // Organic Trails with Gradient Fade
         const trail = trailsRef.current.get(p.id);
-        if (trail && trail.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(trail[0].x, trail[0].y);
-            for(let i=1; i<trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
-            ctx.strokeStyle = p.color;
-            ctx.globalAlpha = 0.4;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.globalAlpha = 1.0;
+        if (trail && trail.length > 2) {
+            // Create gradient from head (current) to tail (old)
+            const head = trail[trail.length-1];
+            const tail = trail[0];
+            // Safe check for degenerate gradients
+            if (head.x !== tail.x || head.y !== tail.y) {
+                const gradient = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+                gradient.addColorStop(0, p.color); // Opaque near head
+                gradient.addColorStop(1, 'rgba(0,0,0,0)'); // Transparent at tail
+                
+                ctx.beginPath();
+                ctx.moveTo(trail[0].x, trail[0].y);
+                
+                // Quadratic bezier smoothing for organic look
+                for (let i = 1; i < trail.length - 1; i++) {
+                    const xc = (trail[i].x + trail[i + 1].x) / 2;
+                    const yc = (trail[i].y + trail[i + 1].y) / 2;
+                    ctx.quadraticCurveTo(trail[i].x, trail[i].y, xc, yc);
+                }
+                ctx.quadraticCurveTo(
+                    trail[trail.length-1].x, 
+                    trail[trail.length-1].y, 
+                    p.pos.x, 
+                    p.pos.y
+                );
+
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 2; // Slightly thicker organic trail
+                ctx.globalAlpha = 0.6;
+                ctx.stroke();
+            }
         }
+        ctx.globalAlpha = 1.0;
 
         // Particle Body
         const intensity = Math.min(1, Math.max(0, (p.val + 1) / 2));

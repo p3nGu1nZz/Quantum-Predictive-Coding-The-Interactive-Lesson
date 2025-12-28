@@ -196,9 +196,18 @@ export default function App() {
       // 2. Generate with API (Queued)
       return new Promise<ArrayBuffer | undefined>((resolve) => {
           enqueueTask(async () => {
-              if (onProgress) onProgress(50);
+              // Simulate progress while waiting for API
+              let currentFakeProgress = 10;
+              const progressInterval = setInterval(() => {
+                  currentFakeProgress += (90 - currentFakeProgress) * 0.1;
+                  if (onProgress) onProgress(currentFakeProgress);
+              }, 200);
+
+              if (onProgress) onProgress(15);
               const generatedBuffer = await generateSpeech(step.narration!);
               
+              clearInterval(progressInterval);
+
               if (generatedBuffer) {
                   if (audioContextRef.current) {
                       try {
