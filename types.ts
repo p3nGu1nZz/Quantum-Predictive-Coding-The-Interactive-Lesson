@@ -10,16 +10,17 @@ export interface Particle {
   pos: Vector2;       // r_i
   vel: Vector2;       // dr_i/dt
   force?: Vector2;    // F_i (Accumulated Force) for prediction
-  val: number;        // x_i (Internal State/Activation)
-  valVel: number;     // dx_i/dt
-  predictedVal?: number; // x_hat_i (Predicted State)
-  phase: number;      // phi_i (Vibrational Phase)
+  val: number;        // x_i (Biomass/Energy)
+  valVel: number;     // dx_i/dt (Growth Rate)
+  predictedVal?: number; // x_hat_i
+  phase: number;      // phi_i
   phaseVel: number;   // dphi/dt
-  spin: number;       // s_i (Intrinsic Spin: -0.5 or +0.5)
-  isFixed?: boolean;  // For sensory nodes
+  spin: number;       // s_i
+  isFixed?: boolean;  
   color: string;
-  visible?: boolean;  // New: For spawning effects
-  scale?: number;     // New: For pulsing effects
+  visible?: boolean;
+  scale?: number;     
+  colonyId?: number;  // New: To distinguish parent vs offspring colonies
 }
 
 export interface Interaction {
@@ -27,21 +28,34 @@ export interface Interaction {
   p2: number;
   strength: number;   // w_ij
   distance: number;   // d_ij
-  coupling: number;   // p_ij(t) - The calculated coupling probability
+  coupling: number;   // p_ij(t)
 }
 
 export interface SimulationConfig {
-  k: number;          // Spring stiffness
-  r0: number;         // Equilibrium distance
-  eta: number;        // Learning rate for state
-  eta_r: number;      // Learning rate for position
-  sigma: number;      // Interaction radius decay
+  k: number;          // Spring stiffness (Cohesion)
+  r0: number;         // Equilibrium distance (Cell Size)
+  eta: number;        // Growth rate
+  eta_r: number;      // Motility
+  sigma: number;      // Interaction radius
   couplingEnabled: boolean;
   phaseEnabled: boolean;
-  spinEnabled: boolean; // New: Toggle spin influence
-  showGhosts?: boolean; // New: Toggle future position prediction visualization
-  temperature: number;  // New: Brownian motion / Entropy
+  spinEnabled: boolean;
+  showGhosts?: boolean;
+  temperature: number;
   damping: number;
+  // Colony Specifics
+  maxColonySize: number;
+  growthRateMultiplier: number;
+  repulsionStrength: number;
+}
+
+export interface Upgrade {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  purchased: boolean;
+  apply: (config: SimulationConfig) => SimulationConfig;
 }
 
 export interface SymbolDefinition {
@@ -57,23 +71,31 @@ export interface QuizQuestion {
 }
 
 export interface ScriptedEvent {
-  at: number; // Percentage 0-100 when this event starts
-  duration?: number; // How long it lasts in percentage points (optional)
-  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset';
+  at: number; // 0-100 percentage of narration
+  duration?: number;
+  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset' | 'setTab' | 'zoom' | 'pan';
   targetId?: number | 'all' | 'center'; 
-  label?: string; // Text for annotation
-  vector?: Vector2; // For force application
-  value?: number; // Generic magnitude
+  label?: string; 
+  vector?: Vector2; 
+  value?: number; // Used for generic magnitude or Tab Index
+  targetZoom?: number; 
+  targetPan?: Vector2;
+}
+
+export interface LessonSubsection {
+  title: string;
+  content: React.ReactNode;
 }
 
 export interface LessonStep {
   title: string;
-  content: React.ReactNode;
+  content: React.ReactNode; // Fallback or summary
+  subsections?: LessonSubsection[]; // New: Tabbed content
   config: SimulationConfig;
   setup: string;
   symbols: SymbolDefinition[];
-  explanation?: React.ReactNode; // Extended educational content
-  narration?: string; // The text script for the AI narrator
-  questions?: QuizQuestion[]; // Pool of questions for the transition quiz
-  script?: ScriptedEvent[]; // Timed events synced to narration progress
+  explanation?: React.ReactNode; 
+  narration?: string; 
+  questions?: QuizQuestion[]; 
+  script?: ScriptedEvent[]; 
 }
