@@ -15,6 +15,7 @@ interface AudioNarratorProps {
   audioContext: AudioContext | null;
   cacheVersion: number; // New prop to signal cache updates
   loadingProgress?: number; // Granular loading progress
+  onProgressUpdate?: (progress: number) => void; // New callback for sync
 }
 
 export const AudioNarrator: React.FC<AudioNarratorProps> = ({ 
@@ -30,7 +31,8 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     audioCache,
     audioContext,
     cacheVersion,
-    loadingProgress = 0
+    loadingProgress = 0,
+    onProgressUpdate
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1.0);
@@ -68,6 +70,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     stopAudio();
     pauseTimeRef.current = 0;
     setProgress(0);
+    if (onProgressUpdate) onProgressUpdate(0);
     setDuration(0);
     setCurrentTime(0);
     setHasAudioLoaded(false);
@@ -114,6 +117,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
              setIsPlaying(false);
              pauseTimeRef.current = 0;
              setProgress(100);
+             if (onProgressUpdate) onProgressUpdate(100);
              setCurrentTime(buffer.duration);
 
              if (isAutoPlayRef.current) {
@@ -131,6 +135,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
             const p = Math.min(100, (current / dur) * 100);
             
             setProgress(p);
+            if (onProgressUpdate) onProgressUpdate(p);
             setCurrentTime(Math.min(current, dur));
             
             if (p < 100) {
@@ -161,6 +166,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     setIsPlaying(false);
     pauseTimeRef.current = 0;
     setProgress(0);
+    if (onProgressUpdate) onProgressUpdate(0);
     setCurrentTime(0);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
   };

@@ -18,6 +18,8 @@ export interface Particle {
   spin: number;       // s_i (Intrinsic Spin: -0.5 or +0.5)
   isFixed?: boolean;  // For sensory nodes
   color: string;
+  visible?: boolean;  // New: For spawning effects
+  scale?: number;     // New: For pulsing effects
 }
 
 export interface Interaction {
@@ -54,6 +56,16 @@ export interface QuizQuestion {
   correctAnswer: string;
 }
 
+export interface ScriptedEvent {
+  at: number; // Percentage 0-100 when this event starts
+  duration?: number; // How long it lasts in percentage points (optional)
+  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset';
+  targetId?: number | 'all' | 'center'; 
+  label?: string; // Text for annotation
+  vector?: Vector2; // For force application
+  value?: number; // Generic magnitude
+}
+
 export interface LessonStep {
   title: string;
   content: React.ReactNode;
@@ -63,4 +75,5 @@ export interface LessonStep {
   explanation?: React.ReactNode; // Extended educational content
   narration?: string; // The text script for the AI narrator
   questions?: QuizQuestion[]; // Pool of questions for the transition quiz
+  script?: ScriptedEvent[]; // Timed events synced to narration progress
 }

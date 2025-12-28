@@ -17,6 +17,7 @@ export default function App() {
   const [isInitialLoading, setIsInitialLoading] = useState(false); 
   const [loadingProgress, setLoadingProgress] = useState(0);   
   const [stepAudioProgress, setStepAudioProgress] = useState(0); 
+  const [currentPlaybackProgress, setCurrentPlaybackProgress] = useState(0); // New state
   const [cacheVersion, setCacheVersion] = useState(0); 
   
   const [stepIndex, setStepIndex] = useState(0);
@@ -272,6 +273,7 @@ export default function App() {
       const checkAudio = async () => {
           const step = LESSON_STEPS[stepIndex];
           setStepAudioProgress(0); // Reset progress bar
+          setCurrentPlaybackProgress(0); // Reset playback timeline
 
           if (step.narration) {
               // Check if already cached
@@ -644,6 +646,7 @@ export default function App() {
                 audioContext={audioContextRef.current} // Pass the context
                 cacheVersion={cacheVersion} // Pass version to trigger updates
                 loadingProgress={stepAudioProgress} // Pass granular progress
+                onProgressUpdate={setCurrentPlaybackProgress} // Pass progress handler
             />
         </div>
       </div>
@@ -663,6 +666,8 @@ export default function App() {
             zoom={zoom}
             pan={pan}
             onPan={setPan}
+            playbackProgress={currentPlaybackProgress}
+            script={currentStep.script}
         />
 
         {/* Real-time Energy Chart Overlay */}

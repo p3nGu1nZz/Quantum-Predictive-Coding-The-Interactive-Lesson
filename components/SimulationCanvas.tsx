@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Particle, Interaction, SimulationConfig, Vector2 } from '../types';
+import { Particle, Interaction, SimulationConfig, Vector2, ScriptedEvent } from '../types';
 import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 
 interface SimulationCanvasProps {
@@ -12,6 +12,8 @@ interface SimulationCanvasProps {
   zoom: number;
   pan: Vector2;
   onPan: (p: Vector2) => void;
+  playbackProgress?: number; // 0-100 from audio
+  script?: ScriptedEvent[]; // Timed events
 }
 
 // Box-Muller transform for Gaussian noise distribution
@@ -30,7 +32,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   interactionMode,
   zoom,
   pan,
-  onPan
+  onPan,
+  playbackProgress = 0,
+  script = []
 }) => {
   const [particles, setParticles] = useState<Particle[]>(initialParticles);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
@@ -212,12 +216,55 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
     }
 
+    // --- SCRIPTED EVENTS ---
+    const activeEvents = script.filter(evt => {
+        const end = evt.at + (evt.duration || 10); // default 10% duration
+        return playbackProgress >= evt.at && playbackProgress < end;
+    });
+
+    // Apply Scripted Forces or Mutations
+    activeEvents.forEach(evt => {
+        if (evt.type === 'force' && evt.vector) {
+            let targets: number[] = [];
+            if (evt.targetId === 'all') targets = ps.map(p => p.id);
+            else if (evt.targetId === 'center') targets = [0]; // Simplified: assume 0 is roughly center or specific
+            else if (typeof evt.targetId === 'number') targets = [evt.targetId];
+            else targets = [0, 1, 2]; // Default cluster
+
+            targets.forEach(tid => {
+                if (forces[tid]) {
+                    forces[tid].x += evt.vector!.x * 2; // Strong push
+                    forces[tid].y += evt.vector!.y * 2;
+                }
+            });
+        }
+        
+        if (evt.type === 'pulse') {
+             // Modulate scale or brightness
+             // We'll update the particle properties directly in the map loop below
+        }
+    });
+
     simFrameRef.current++;
     const currentFrame = simFrameRef.current;
     let historyError = 0;
 
     // Apply Updates
     const nextParticles = ps.map((p, i) => {
+        // Handle Pulse/Visibility overrides from script
+        let scale = 1.0;
+        let visible = p.visible !== undefined ? p.visible : true;
+        let activationMod = 0;
+
+        activeEvents.forEach(evt => {
+            const isTarget = evt.targetId === 'all' || evt.targetId === p.id || (evt.targetId === 'center' && i === 0);
+            if (isTarget) {
+                if (evt.type === 'spawn') visible = true;
+                if (evt.type === 'pulse') scale = 1.5 + Math.sin(currentFrame * 0.2) * 0.3;
+                if (evt.type === 'highlight') scale = 1.3;
+            }
+        });
+
         // Trail Logic
         if (!trailsRef.current.has(p.id)) trailsRef.current.set(p.id, []);
         const trail = trailsRef.current.get(p.id)!;
@@ -238,7 +285,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             ty = Math.max(10, Math.min(CANVAS_HEIGHT - 10, ty));
             return { ...p, pos: { x: tx, y: ty }, vel: { x: 0, y: 0 }, force: {x:0,y:0}, valVel: 0 };
         }
-        if (p.isFixed) return p;
+        if (p.isFixed) return { ...p, scale, visible };
 
         // Prediction Error
         let predictedVal = 0;
@@ -262,7 +309,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             newVelY = (newVelY / speed) * maxVel;
         }
 
-        const newValVel = p.valVel * config.damping + forceState;
+        const newValVel = p.valVel * config.damping + forceState + activationMod;
         const newPhaseVel = phaseDrifts[i] + 0.02;
         const newPhase = (p.phase + newPhaseVel) % (2 * Math.PI);
 
@@ -285,7 +332,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             valVel: newValVel,
             predictedVal,
             phase: newPhase,
-            phaseVel: newPhaseVel
+            phaseVel: newPhaseVel,
+            scale,
+            visible
         };
     });
 
@@ -312,7 +361,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     }
 
     return { particles: nextParticles, interactions: newInteractions, energy: { pred: totalPredEnergy, pos: totalPosEnergy, historyError } };
-  }, [particles, config, resetAnim]);
+  }, [particles, config, resetAnim, playbackProgress, script]);
 
   const animate = useCallback(() => {
     if (!isRunning && (!resetAnim || !resetAnim.active) && draggingId.current === null) return;
@@ -378,7 +427,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const p1 = particles.find(p => p.id === int.p1);
         const p2 = particles.find(p => p.id === int.p2);
         
-        if (p1 && p2) {
+        if (p1 && p2 && p1.visible !== false && p2.visible !== false) {
              ctx.beginPath();
              ctx.moveTo(p1.pos.x, p1.pos.y);
              ctx.lineTo(p2.pos.x, p2.pos.y);
@@ -386,24 +435,19 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              
              // Spin Interaction Visuals
              if (config.spinEnabled) {
-                 // Parallel spins (0.25) vs Anti-parallel (-0.25)
                  const spinProd = p1.spin * p2.spin;
-                 // Note: spins are +/- 0.5. product is +0.25 (parallel) or -0.25 (anti)
                  const isAligned = spinProd > 0;
                  
                  if (isAligned) {
-                     // Strong attractive bond - Solid Green
                      ctx.strokeStyle = COLORS.green;
                      ctx.lineWidth = 1.5 + 2 * opacity;
                      ctx.setLineDash([]);
                  } else {
-                     // Repulsive/Weak bond - Dashed Orange
                      ctx.strokeStyle = COLORS.orange;
                      ctx.lineWidth = 1 + opacity;
-                     ctx.setLineDash([4, 6]); // Visual indicator for spin-spin repulsion
+                     ctx.setLineDash([4, 6]); 
                  }
              } else {
-                 // Standard Mode
                  ctx.strokeStyle = COLORS.purple;
                  ctx.lineWidth = 1 + 2 * opacity;
                  if (opacity < 0.3) {
@@ -423,9 +467,10 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.lineJoin = 'round';
 
     particles.forEach(p => {
-        // Ghost Particles (Future Prediction) with Physics Simulation
+        if (p.visible === false) return;
+
+        // Ghost Particles
         if (config.showGhosts) {
-             // Simulate trajectory for this particle
              const simSteps = 30;
              let simPos = { ...p.pos };
              let simVel = { ...p.vel };
@@ -434,17 +479,15 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              ctx.moveTo(simPos.x, simPos.y);
              
              for(let i=0; i<simSteps; i++) {
-                 // Apply damping
                  simVel.x *= config.damping;
                  simVel.y *= config.damping;
-                 // Apply current instantaneous force (approximate field)
-                 simVel.x += p.force.x * config.eta_r;
-                 simVel.y += p.force.y * config.eta_r;
+                 simVel.x += p.force!.x * config.eta_r;
+                 simVel.y += p.force!.y * config.eta_r;
                  
                  simPos.x += simVel.x;
                  simPos.y += simVel.y;
                  
-                 if (i % 5 === 0) { // Draw dots every few steps
+                 if (i % 5 === 0) { 
                      ctx.lineTo(simPos.x, simPos.y);
                  }
              }
@@ -455,29 +498,25 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              ctx.stroke();
              ctx.setLineDash([]);
              
-             // Draw final ghost head
              ctx.beginPath();
              ctx.arc(simPos.x, simPos.y, 3, 0, Math.PI*2);
              ctx.fillStyle = COLORS.yellow;
              ctx.fill();
         }
 
-        // Organic Trails with Gradient Fade
+        // Organic Trails
         const trail = trailsRef.current.get(p.id);
         if (trail && trail.length > 2) {
-            // Create gradient from head (current) to tail (old)
             const head = trail[trail.length-1];
             const tail = trail[0];
-            // Safe check for degenerate gradients
             if (head.x !== tail.x || head.y !== tail.y) {
                 const gradient = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
-                gradient.addColorStop(0, p.color); // Opaque near head
-                gradient.addColorStop(1, 'rgba(0,0,0,0)'); // Transparent at tail
+                gradient.addColorStop(0, p.color); 
+                gradient.addColorStop(1, 'rgba(0,0,0,0)'); 
                 
                 ctx.beginPath();
                 ctx.moveTo(trail[0].x, trail[0].y);
                 
-                // Quadratic bezier smoothing for organic look
                 for (let i = 1; i < trail.length - 1; i++) {
                     const xc = (trail[i].x + trail[i + 1].x) / 2;
                     const yc = (trail[i].y + trail[i + 1].y) / 2;
@@ -491,7 +530,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 );
 
                 ctx.strokeStyle = gradient;
-                ctx.lineWidth = 2; // Slightly thicker organic trail
+                ctx.lineWidth = 2;
                 ctx.globalAlpha = 0.6;
                 ctx.stroke();
             }
@@ -505,10 +544,12 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         else if (config.spinEnabled) baseColor = p.spin > 0 ? COLORS.green : COLORS.orange;
         
         const isHovered = hoveredId === p.id;
-        const radius = isHovered ? 16 : 12;
+        // Apply extra scaling from script if present
+        const currentScale = p.scale || 1.0;
+        const radius = (isHovered ? 16 : 12) * currentScale;
 
         // Glow
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 10 * currentScale;
         ctx.shadowColor = baseColor;
         ctx.fillStyle = baseColor;
         ctx.beginPath();
@@ -520,19 +561,23 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1.0;
         ctx.strokeStyle = COLORS.white;
-        ctx.lineWidth = isHovered ? 3 : 2;
+        ctx.lineWidth = (isHovered ? 3 : 2) * currentScale;
         ctx.stroke();
 
-        // Spin Indicator (Triangle)
+        // Spin Indicator
         if (config.spinEnabled) {
             ctx.save();
             ctx.translate(p.pos.x + radius + 8, p.pos.y);
             ctx.fillStyle = baseColor;
             ctx.beginPath();
             if (p.spin > 0) {
-                ctx.moveTo(-5, 3); ctx.lineTo(0, -6); ctx.lineTo(5, 3);
+                ctx.moveTo(-5 * currentScale, 3 * currentScale); 
+                ctx.lineTo(0, -6 * currentScale); 
+                ctx.lineTo(5 * currentScale, 3 * currentScale);
             } else {
-                ctx.moveTo(-5, -3); ctx.lineTo(0, 6); ctx.lineTo(5, -3);
+                ctx.moveTo(-5 * currentScale, -3 * currentScale); 
+                ctx.lineTo(0, 6 * currentScale); 
+                ctx.lineTo(5 * currentScale, -3 * currentScale);
             }
             ctx.closePath();
             ctx.fill();
@@ -547,7 +592,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             ctx.shadowBlur = 5;
             ctx.shadowColor = COLORS.white;
             ctx.beginPath();
-            ctx.arc(phaseX, phaseY, 3, 0, Math.PI * 2);
+            ctx.arc(phaseX, phaseY, 3 * currentScale, 0, Math.PI * 2);
             ctx.fill();
             ctx.shadowBlur = 0;
             
@@ -561,33 +606,61 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             ctx.globalAlpha = 1.0;
         }
 
-        // Value Text (Formatted for clarity)
+        // Value Text
         let valStr = p.val.toFixed(2);
-        // Fix for "e+22" visual clutter: switch to scientific if too large
         if (Math.abs(p.val) > 100) valStr = p.val.toExponential(1);
         
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(p.pos.x - 14, p.pos.y - 6, 28, 12);
         ctx.fillStyle = "white";
-        ctx.font = "bold 10px monospace";
+        ctx.font = `bold ${10 * currentScale}px monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(valStr, p.pos.x, p.pos.y);
     });
 
+    // Render Annotations from Script
+    script.forEach(evt => {
+        const end = evt.at + (evt.duration || 10);
+        if (playbackProgress >= evt.at && playbackProgress < end && evt.type === 'annotate' && evt.label) {
+            ctx.save();
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.strokeStyle = COLORS.blue;
+            ctx.lineWidth = 2;
+            
+            // Default center if no target, or particle pos if targeted
+            let pos = { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 - 100 };
+            if (typeof evt.targetId === 'number') {
+                const t = particles.find(p => p.id === evt.targetId);
+                if (t) pos = { x: t.pos.x, y: t.pos.y - 40 };
+            }
+
+            // Draw box
+            const textWidth = ctx.measureText(evt.label).width;
+            const pad = 10;
+            ctx.fillRect(pos.x - textWidth/2 - pad, pos.y - 15 - pad, textWidth + pad*2, 30 + pad);
+            ctx.strokeRect(pos.x - textWidth/2 - pad, pos.y - 15 - pad, textWidth + pad*2, 30 + pad);
+            
+            // Draw text
+            ctx.fillStyle = COLORS.white;
+            ctx.font = "bold 20px 'Orbitron'";
+            ctx.textAlign = "center";
+            ctx.fillText(evt.label, pos.x, pos.y);
+            ctx.restore();
+        }
+    });
+
     ctx.restore();
 
-  }, [particles, interactions, zoom, pan, containerSize, hoveredId]);
+  }, [particles, interactions, zoom, pan, containerSize, hoveredId, playbackProgress, script]);
 
-  // Coordinate Mapping for Mouse Events
+  // Coordinate Mapping for Mouse Events (Unchanged)
   const getCanvasCoords = (clientX: number, clientY: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return {x:0, y:0};
       const rect = canvas.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
-      
-      // Inverse transform
       const vbW = CANVAS_WIDTH / zoom;
       const vbH = CANVAS_HEIGHT / zoom;
       const vbX = (CANVAS_WIDTH - vbW) / 2 + pan.x;
@@ -595,26 +668,17 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       const scale = Math.min(containerSize.width / vbW, containerSize.height / vbH);
       const tx = (containerSize.width - vbW * scale) / 2;
       const ty = (containerSize.height - vbH * scale) / 2;
-
-      return {
-          x: (x - tx) / scale + vbX,
-          y: (y - ty) / scale + vbY
-      };
+      return { x: (x - tx) / scale + vbX, y: (y - ty) / scale + vbY };
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
       const coords = getCanvasCoords(e.clientX, e.clientY);
       let hitId: number | null = null;
-      // Reverse loop to hit top particles first
       for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           const dist = Math.sqrt((coords.x - p.pos.x)**2 + (coords.y - p.pos.y)**2);
-          if (dist < 20) { // Hit radius
-              hitId = p.id;
-              break;
-          }
+          if (dist < 20) { hitId = p.id; break; }
       }
-
       if (hitId !== null) {
           if (interactionMode === 'drag') {
               draggingId.current = hitId;
@@ -629,19 +693,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
       const coords = getCanvasCoords(e.clientX, e.clientY);
-      
-      // Hover Check
       let hitId: number | null = null;
       for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           const dist = Math.sqrt((coords.x - p.pos.x)**2 + (coords.y - p.pos.y)**2);
-          if (dist < 20) {
-              hitId = p.id;
-              break;
-          }
+          if (dist < 20) { hitId = p.id; break; }
       }
       setHoveredId(hitId);
-
       if (draggingId.current !== null) {
           isDragging.current = true;
           mousePosRef.current = coords;
