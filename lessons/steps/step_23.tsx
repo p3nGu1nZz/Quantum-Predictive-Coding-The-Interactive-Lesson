@@ -12,11 +12,11 @@ export const Step23: LessonStep = {
     subsections: [
         { at: 0, title: "Attention", content: <p>In quantum mechanics, momentum dictates scope. We use this to build a Variable Attention Mechanism.</p> },
         { at: 40, title: "De Broglie Relations", content: <div className="space-y-4">
-            <p>We treat particles as wave-packets where the wavelength <InlineMath math="\lambda" /> is inversely proportional to momentum <InlineMath math="p" /> (Error magnitude):</p>
+            <p>We treat particles as wave-packets where the wavelength <InlineMath math="\\lambda" /> is inversely proportional to momentum <InlineMath math="p" /> (Error magnitude):</p>
             <MathBlock>{'\\lambda = \\frac{h}{p} \\quad \\Rightarrow \\quad \\text{Attn Radius} \\propto \\frac{1}{\\text{Error}}'}</MathBlock>
             <ul className="list-disc pl-5">
-                <li><strong>High Error (High Momentum):</strong> Small <InlineMath math="\lambda" />. The particle focuses locally on immediate corrections.</li>
-                <li><strong>Low Error (Low Momentum):</strong> Large <InlineMath math="\lambda" />. The particle expands its scope to integrate global context.</li>
+                <li><strong>High Error (High Momentum):</strong> Small <InlineMath math="\\lambda" />. The particle focuses locally on immediate corrections.</li>
+                <li><strong>Low Error (Low Momentum):</strong> Large <InlineMath math="\\lambda" />. The particle expands its scope to integrate global context.</li>
             </ul>
         </div>}
     ],

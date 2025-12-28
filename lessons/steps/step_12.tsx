@@ -12,7 +12,7 @@ export const Step12: LessonStep = {
     subsections: [
         { at: 0, title: "Gravity for Data", content: <p>In classical machine learning, Gradient Descent is an iterative optimization algorithm. In the L-Group framework, it is a physical law: <strong>Gravity</strong> acting on high-dimensional data.</p> },
         { at: 40, title: "Kinetic Optimization", content: <div className="space-y-4">
-            <p>We derive the motion of every particle from the potential energy field of the error landscape. The force vector <InlineMath math="\mathbf{F}_i" /> is the negative gradient of the loss <InlineMath math="\mathcal{L}" />:</p>
+            <p>We derive the motion of every particle from the potential energy field of the error landscape. The force vector <InlineMath math="\\mathbf{F}_i" /> is the negative gradient of the loss <InlineMath math="\\mathcal{L}" />:</p>
             <MathBlock>{'\\mathbf{F}_i = -\\nabla_{\\mathbf{r}_i} \\mathcal{L} \\quad \\Rightarrow \\quad \\mathbf{a}_i \\propto \\text{Slope}'}</MathBlock>
             <p>This transforms an abstract calculus operation into a kinetic simulation. Particles "roll" down the error surface, accelerating where the gradient is steep (high error) and naturally braking as the terrain flattens (convergence). It is a self-regulating optimizer driven by the geometry of the problem itself.</p>
         </div>}

@@ -14,7 +14,7 @@ export const Step05: LessonStep = {
         { at: 50, title: "Deep Dive", content: <div className="space-y-4">
             <p>How does the brain connect the color "Red" to the shape "Square" without a central processor? This is the <strong>Binding Problem</strong>. Our solution utilizes temporal synchronization derived from the <strong>Kuramoto Model</strong>.</p>
             <MathBlock title="Coupling Probability">{'p_{ij}(t) \\propto \\exp\\left(-\\frac{d_{ij}^2}{\\sigma^2}\\right) \\cos(\\phi_i(t) - \\phi_j(t))'}</MathBlock>
-            <p>The term <InlineMath math="\cos(\phi_i - \phi_j)" /> in Equation 26 acts as a gate. Particles can only interact ("talk") when their phases are aligned. This allows the network to form transient, functional coalitions—temporary logic circuits—that exist only as long as the rhythm is maintained, solving the binding problem through time rather than space.</p>
+            <p>The term <InlineMath math="\\cos(\\phi_i - \\phi_j)" /> in Equation 26 acts as a gate. Particles can only interact ("talk") when their phases are aligned. This allows the network to form transient, functional coalitions—temporary logic circuits—that exist only as long as the rhythm is maintained, solving the binding problem through time rather than space.</p>
         </div>}
     ],
     config: p({ phaseEnabled: true, couplingEnabled: true }), setup: 'kuramoto_sync', symbols: [],

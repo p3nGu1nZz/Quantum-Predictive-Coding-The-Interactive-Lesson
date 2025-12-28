@@ -14,7 +14,7 @@ export const Step21: LessonStep = {
         { at: 40, title: "Stochastic Dynamics", content: <div className="space-y-4">
             <p>We introduce a stochastic term (Noise) to the update rule, transforming it into a <strong>Langevin Equation</strong>:</p>
             <MathBlock>{'dp = -\\nabla V dt - \\gamma p dt + \\sqrt{2\\gamma k_B T} dW'}</MathBlock>
-            <p>Here, <InlineMath math="T" /> represents Temperature. High <InlineMath math="T" /> gives particles enough kinetic energy to "jump" over energy barriers and escape suboptimal solutions. As the system cools (<InlineMath math="T \to 0" />), it settles into the global minimum. This is <strong>Simulated Annealing</strong>—using chaos to find order.</p>
+            <p>Here, <InlineMath math="T" /> represents Temperature. High <InlineMath math="T" /> gives particles enough kinetic energy to "jump" over energy barriers and escape suboptimal solutions. As the system cools (<InlineMath math="T \\to 0" />), it settles into the global minimum. This is <strong>Simulated Annealing</strong>—using chaos to find order.</p>
         </div>}
     ],
     config: p({ temperature: 5.0 }), setup: 'annealing', symbols: [],

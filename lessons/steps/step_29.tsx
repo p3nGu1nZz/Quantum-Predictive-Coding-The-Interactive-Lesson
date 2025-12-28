@@ -14,7 +14,7 @@ export const Step29: LessonStep = {
         { at: 40, title: "Synchronization", content: <div className="space-y-4">
             <p>We quantify "understanding" using the <strong>Kuramoto Order Parameter</strong> <InlineMath math="R" />:</p>
             <MathBlock>{'R e^{i \\Psi} = \\frac{1}{N} \\sum_{j=1}^{N} e^{i \\theta_j}'}</MathBlock>
-            <p><InlineMath math="R \approx 0" /> represents noise and confusion. <InlineMath math="R \approx 1" /> represents synchronization and insight. The moment of learning is a <strong>Thermodynamic Phase Transition</strong>. We use this signal to gate Hebbian plasticity—meaning we only "save" the memory when the network successfully clicks into place ("He who syncs, links").</p>
+            <p><InlineMath math="R \\approx 0" /> represents noise and confusion. <InlineMath math="R \\approx 1" /> represents synchronization and insight. The moment of learning is a <strong>Thermodynamic Phase Transition</strong>. We use this signal to gate Hebbian plasticity—meaning we only "save" the memory when the network successfully clicks into place ("He who syncs, links").</p>
         </div>}
     ],
     config: p({ phaseEnabled: true }), setup: 'kuramoto_sync', symbols: [],

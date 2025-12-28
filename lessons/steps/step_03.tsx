@@ -12,12 +12,12 @@ export const Step03: LessonStep = {
     subsections: [
         { at: 0, title: "Components", content: <p>Position, Activation, Phase, Spin.</p> },
         { at: 50, title: "Deep Dive", content: <div className="space-y-4">
-            <p>We extend the classical neuron model by embedding it into a 3D Hilbert Space <InlineMath math="\mathcal{H}" />. Each agent in our system is not just a scalar value, but a state vector <InlineMath math="\psi_i" /> (Table I) comprising four distinct physical properties:</p>
+            <p>We extend the classical neuron model by embedding it into a 3D Hilbert Space <InlineMath math="\\mathcal{H}" />. Each agent in our system is not just a scalar value, but a state vector <InlineMath math="\\psi_i" /> (Table I) comprising four distinct physical properties:</p>
             <ul className="list-disc pl-5 space-y-2">
-                <li><strong>Position (<InlineMath math="\mathbf{r}_i \in \mathbb{R}^3" />):</strong> Defines spatial embedding and valid connectivity neighborhoods (Eq 1).</li>
-                <li><strong>Activation (<InlineMath math="x_i \in \mathbb{R}" />):</strong> Encodes the predictive information or "hypothesis" strength.</li>
-                <li><strong>Phase (<InlineMath math="\phi_i(t)" />):</strong> Governs oscillatory dynamics and temporal binding (Eq 26).</li>
-                <li><strong>Spin (<InlineMath math="s_i \in \{-\frac{1}{2}, +\frac{1}{2}\}" />):</strong> Enables quantum-like multiplexing and channel separation (Eq 18).</li>
+                <li><strong>Position (<InlineMath math="\\mathbf{r}_i \\in \\mathbb{R}^3" />):</strong> Defines spatial embedding and valid connectivity neighborhoods (Eq 1).</li>
+                <li><strong>Activation (<InlineMath math="x_i \\in \\mathbb{R}" />):</strong> Encodes the predictive information or "hypothesis" strength.</li>
+                <li><strong>Phase (<InlineMath math="\\phi_i(t)" />):</strong> Governs oscillatory dynamics and temporal binding (Eq 26).</li>
+                <li><strong>Spin (<InlineMath math="s_i \\in \\{-\\frac{1}{2}, +\\frac{1}{2}\\}" />):</strong> Enables quantum-like multiplexing and channel separation (Eq 18).</li>
             </ul>
             <p>This formulation aligns with the <strong>Dirac equation</strong> for spin-½ particles, allowing us to leverage the rich mathematical toolkit of quantum mechanics to describe cognitive evolution.</p>
         </div>}

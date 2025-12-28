@@ -14,7 +14,7 @@ export const Step15: LessonStep = {
         { at: 40, title: "Thermodynamics of Mind", content: <div className="space-y-4">
             <p>Karl Friston's <strong>Free Energy Principle</strong> posits that all self-organizing systems minimize a bound on surprise (entropy). We translate this into a potential energy function:</p>
             <MathBlock>{'F = \\underbrace{-\\ln p(\\mathbf{y} | m)}_{Accuracy} + \\underbrace{D_{KL}[q(\\psi) || p(\\psi)]}_{Complexity}'}</MathBlock>
-            <p>In our simulation, <InlineMath math="F \propto \text{Potential Energy}" />. The system is not merely "calculating" probabilities; it is physically flowing down a thermodynamic gradient towards the state of maximum likelihood. It consumes energy to create order.</p>
+            <p>In our simulation, <InlineMath math="F \\propto \\text{Potential Energy}" />. The system is not merely "calculating" probabilities; it is physically flowing down a thermodynamic gradient towards the state of maximum likelihood. It consumes energy to create order.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'error_landscape', symbols: [],

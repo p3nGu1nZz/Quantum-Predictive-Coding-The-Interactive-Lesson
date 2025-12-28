@@ -14,12 +14,12 @@ export const Step09: LessonStep = {
         { at: 50, title: "Deep Dive", content: <div className="space-y-4">
             <p>Classical mechanics dictates that force is the negative gradient of potential energy. We apply this rigorously to our inference engine. The force acting on particle <InlineMath math="i" /> due to particle <InlineMath math="j" /> is derived in Equation 8:</p>
             <MathBlock title="Vector Force">{'\\mathbf{F}_{ij} = -\\nabla_{\\mathbf{r}_i} V_{ij} = -k (d_{ij} - r_0) \\hat{\\mathbf{d}}_{ij}'}</MathBlock>
-            <p>Unlike scalar activation propagation, <strong>Vector Forces</strong> preserve directional information (<InlineMath math="\hat{\mathbf{d}}_{ij}" />). This ensures that information doesn't just "spread" like a gas; it "pushes" with intent. Conflicting evidence (vectors pointing in opposite directions) creates a "null space" or saddle point—a physical representation of hesitation or uncertainty that scalar systems cannot easily model.</p>
+            <p>Unlike scalar activation propagation, <strong>Vector Forces</strong> preserve directional information (<InlineMath math="\\hat{\\mathbf{d}}_{ij}" />). This ensures that information doesn't just "spread" like a gas; it "pushes" with intent. Conflicting evidence (vectors pointing in opposite directions) creates a "null space" or saddle point—a physical representation of hesitation or uncertainty that scalar systems cannot easily model.</p>
         </div>}
     ],
     config: p({ k: 0.05 }), setup: 'fluid_flow', symbols: [],
     script: [ 
-        { at: 10, type: 'highlight', targetId: 'all', label: "Vectors" },
+        { at: 10, type: 'highlight', targetId: 'all', label: "Vectors" }, 
         { at: 35, type: 'force', targetId: 'all', vector: {x: -3, y: 0}, label: "Turn Left" }, 
         { at: 45, type: 'force', targetId: 'all', vector: {x: 3, y: 0}, label: "Turn Right" }, 
         { at: 65, type: 'reset', label: "Null Space" },

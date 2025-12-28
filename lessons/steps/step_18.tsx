@@ -11,7 +11,7 @@ export const Step18: LessonStep = {
     subsections: [
         { at: 0, title: "Memory", content: <p>Without loops, there is no memory. We introduce recurrence to create persistence.</p> },
         { at: 40, title: "Phase Space", content: <div className="space-y-4">
-            <p>In dynamical systems, a <strong>Limit Cycle</strong> is a stable, closed trajectory in phase space. By arranging particles in a ring and reducing damping <InlineMath math="\gamma" />, we create a trap for information.</p>
+            <p>In dynamical systems, a <strong>Limit Cycle</strong> is a stable, closed trajectory in phase space. By arranging particles in a ring and reducing damping <InlineMath math="\\gamma" />, we create a trap for information.</p>
             <p>Signals entering the loop are preserved by their own <strong>Inertia</strong> (Momentum <InlineMath math="p" />). This is the physical mechanism for <strong>Working Memory</strong>—maintaining an active state after the sensory input has vanished. It is the echo of the past, spinning in the geometry of the present.</p>
         </div>}
     ],
