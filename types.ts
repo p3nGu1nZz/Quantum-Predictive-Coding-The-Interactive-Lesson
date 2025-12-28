@@ -83,14 +83,15 @@ export interface ScriptedEvent {
 }
 
 export interface LessonSubsection {
+  at: number; // Percentage (0-100) when this section becomes active
   title: string;
   content: React.ReactNode;
 }
 
 export interface LessonStep {
   title: string;
-  content: React.ReactNode; // Fallback or summary
-  subsections?: LessonSubsection[]; // New: Tabbed content
+  content: React.ReactNode; // Fallback
+  subsections?: LessonSubsection[]; // Dynamic content sections
   config: SimulationConfig;
   setup: string;
   symbols: SymbolDefinition[];

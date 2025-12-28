@@ -12,111 +12,155 @@ export const createParticles = (type: string): Particle[] => {
         val, valVel: 0, phase, phaseVel: 0.1, spin, color, isFixed: fixed
     });
 
-    if (type === 'grid') {
-        const particles: Particle[] = [];
-        const rows = 5;
-        const cols = 5;
-        const spacing = 60;
-        let id = 0;
-        for(let r=0; r<rows; r++) {
-            for(let c=0; c<cols; c++) {
-                particles.push(mkP(id++, cx + (c-2)*spacing, cy + (r-2)*spacing, COLORS.blue, (r+c)%2, (r%2 === 0 ? 0.5 : -0.5), false, (r+c)));
+    switch (type) {
+        case 'grid': {
+            const particles: Particle[] = [];
+            const rows = 6; const cols = 8; const spacing = 70;
+            let id = 0;
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    const px = cx + (c - cols/2 + 0.5) * spacing;
+                    const py = cy + (r - rows/2 + 0.5) * spacing;
+                    particles.push(mkP(id++, px, py, COLORS.blue, (r+c)%2, 0.5, false, r+c));
+                }
             }
+            return particles;
         }
-        return particles;
-    } else if (type === 'spin_cluster') {
-         // Two interacting clusters with different spins
-         const particles: Particle[] = [];
-         let id = 0;
-         for(let i=0; i<15; i++) {
-             // Spin Up Cluster (Left)
-             particles.push({
-                 id: id++, pos: { x: cx - 150 + (Math.random()-0.5)*120, y: cy + (Math.random()-0.5)*120 },
-                 vel: {x:0,y:0}, force: zeroForce, val: 1, valVel: 0, phase: Math.random()*6, phaseVel: 0.1,
-                 spin: 0.5, color: COLORS.green, isFixed: false
-             });
-             // Spin Down Cluster (Right)
-             particles.push({
-                 id: id++, pos: { x: cx + 150 + (Math.random()-0.5)*120, y: cy + (Math.random()-0.5)*120 },
-                 vel: {x:0,y:0}, force: zeroForce, val: 0, valVel: 0, phase: Math.random()*6, phaseVel: 0.1,
-                 spin: -0.5, color: COLORS.orange, isFixed: false
-             });
-         }
-         return particles;
-    } else if (type === 'logic_gate') {
-        // AND, OR, NOT Gate Simulation
-        return [
-            mkP(0, cx-200, cy-150, COLORS.red, 0, 0.5, true), // Input A
-            mkP(1, cx-200, cy-50, COLORS.red, 0, 0.5, true),  // Input B
-            mkP(2, cx-50, cy-100, COLORS.blue, 0, 0.5),       // Processor
-            mkP(3, cx+100, cy-100, COLORS.green, 0, 0.5),     // Output
-            
-            mkP(4, cx-200, cy+50, COLORS.red, 0, 0.5, true),  // Input C
-            mkP(5, cx-200, cy+150, COLORS.red, 0, 0.5, true), // Input D
-            mkP(6, cx-50, cy+100, COLORS.blue, 0.5, 0.5),     // Processor (Biased OR)
-            mkP(7, cx+100, cy+100, COLORS.green, 0, 0.5),     // Output
-        ];
-    } else if (type === 'memory_loop') {
-        const particles: Particle[] = [];
-        const loops = 1;
-        let id = 0;
-        // A simple recurrent loop
-        const radius = 80;
-        const count = 6;
-        for(let i=0; i<count; i++) {
-            const angle = (i/count) * Math.PI * 2;
-            particles.push(mkP(id++, cx + Math.cos(angle)*radius, cy + Math.sin(angle)*radius, COLORS.purple, 0, 0.5, false, angle));
-        }
-        // Input node
-        particles.push(mkP(id++, cx - 200, cy, COLORS.red, 1, 0.5, true));
-        return particles;
-    } else if (type === 'inhibitory_circuit') {
-         // Feedforward Inhibition
-         return [
-            mkP(0, cx-200, cy, COLORS.red, 1.0, 0.5, true),   // Exc Input
-            mkP(1, cx-100, cy-60, COLORS.blue, 0, 0.5),       // Interneuron A (Exc)
-            mkP(2, cx-100, cy+60, COLORS.orange, 0, -0.5),    // Interneuron B (Inhib Spin)
-            mkP(3, cx+50, cy, COLORS.green, 0, 0.5),          // Output Soma
-        ];
-    } else if (type === 'fluid_flow') {
-        // Flow simulation for Probability Current
-        const particles: Particle[] = [];
-        const rows = 4;
-        const cols = 10;
-        let id = 0;
-        for(let r=0; r<rows; r++) {
-            for(let c=0; c<cols; c++) {
-                const fixed = c === 0; // Source
-                particles.push(mkP(id++, cx - 350 + c*70, cy + (r-1.5)*50, fixed ? COLORS.red : COLORS.teal, fixed ? 1 : 0, 0.5, fixed, c*0.5));
+        case 'error_landscape': {
+            const particles: Particle[] = [];
+            for(let i=0; i<40; i++) {
+                // Distributed randomly at top
+                particles.push(mkP(i, cx + (Math.random()-0.5)*CANVAS_WIDTH, 50 + Math.random()*100, COLORS.red, 1, 0.5, false));
             }
+            return particles;
         }
-        return particles;
-    } else if (type === 'kuramoto_sync') {
-        const particles: Particle[] = [];
-        for(let i=0; i<40; i++) {
-            particles.push(mkP(i, cx + (Math.random()-0.5)*500, cy + (Math.random()-0.5)*350, COLORS.blue, Math.random(), 0.5, false, Math.random()*6));
+        case 'single_particle': {
+            return [mkP(0, cx, cy, COLORS.yellow, 1, 0.5, false, 0)];
         }
-        return particles;
-    } else if (type === 'swarm' || type === 'random') {
-        // Standard Swarm
-        const p = [];
-        for(let i=0; i<40; i++) {
-            const isSensory = i < 4; 
-            p.push({
-                id: i,
-                pos: { x: cx + (Math.random()-0.5)*600, y: cy + (Math.random()-0.5)*400 },
-                vel: {x:0, y:0},
-                force: zeroForce,
-                val: isSensory ? 1 : Math.random(), 
-                valVel: 0,
-                phase: Math.random() * Math.PI * 2,
-                phaseVel: 0.05 + Math.random()*0.05,
-                spin: Math.random() > 0.5 ? 0.5 : -0.5,
-                color: isSensory ? COLORS.red : COLORS.blue,
-                isFixed: isSensory
-            });
+        case 'interference_grid': {
+            const particles: Particle[] = [];
+            const rows = 8; const cols = 12; const spacing = 50;
+            let id = 0;
+            for(let r=0; r<rows; r++) {
+                for(let c=0; c<cols; c++) {
+                    particles.push(mkP(id++, cx + (c - cols/2)*spacing, cy + (r - rows/2)*spacing, COLORS.teal, 0, 0.5, true, 0));
+                }
+            }
+            return particles;
         }
-        return p;
+        case 'kuramoto_sync': {
+            const particles: Particle[] = [];
+            for(let i=0; i<50; i++) {
+                particles.push(mkP(i, cx + (Math.random()-0.5)*600, cy + (Math.random()-0.5)*400, COLORS.blue, Math.random(), 0.5, false, Math.random()*Math.PI*2));
+            }
+            return particles;
+        }
+        case 'spin_cluster': {
+             const particles: Particle[] = [];
+             let id = 0;
+             // Left group (Spin Up)
+             for(let i=0; i<20; i++) {
+                 particles.push(mkP(id++, cx - 200 + (Math.random()-0.5)*150, cy + (Math.random()-0.5)*150, COLORS.green, 1, 0.5, false));
+             }
+             // Right group (Spin Down)
+             for(let i=0; i<20; i++) {
+                 particles.push(mkP(id++, cx + 200 + (Math.random()-0.5)*150, cy + (Math.random()-0.5)*150, COLORS.orange, 0, -0.5, false));
+             }
+             return particles;
+        }
+        case 'cavity': {
+            // Particles inside a box
+            const particles: Particle[] = [];
+            for(let i=0; i<30; i++) {
+                particles.push(mkP(i, cx + (Math.random()-0.5)*200, cy + (Math.random()-0.5)*200, COLORS.purple, 0.5, 0.5, false));
+            }
+            // Add fixed boundary markers
+            const radius = 250;
+            for(let i=0; i<20; i++) {
+                const ang = (i/20) * Math.PI*2;
+                particles.push(mkP(100+i, cx + Math.cos(ang)*radius, cy + Math.sin(ang)*radius, COLORS.grey, 0, 0, true));
+            }
+            return particles;
+        }
+        case 'fluid_flow': {
+            const particles: Particle[] = [];
+            for(let i=0; i<100; i++) {
+                particles.push({
+                    id: i, pos: { x: (Math.random()) * CANVAS_WIDTH, y: (Math.random()) * CANVAS_HEIGHT },
+                    vel: {x: 2 + Math.random(), y: (Math.random()-0.5)}, 
+                    force: zeroForce, val: 0.5, valVel: 0, phase: i, phaseVel: 0.1, spin: 0.5, color: COLORS.teal, isFixed: false
+                });
+            }
+            return particles;
+        }
+        case 'logic_gate': {
+            // AND Gate-like structure
+            const particles: Particle[] = [];
+            // Inputs
+            particles.push(mkP(0, cx-100, cy-100, COLORS.yellow, 0, 0.5, true)); // Input A
+            particles.push(mkP(1, cx-100, cy+100, COLORS.yellow, 0, 0.5, true)); // Input B
+            // Processing nodes
+            particles.push(mkP(2, cx, cy, COLORS.blue, 0.1, 0.5, false));
+            // Output
+            particles.push(mkP(3, cx+100, cy, COLORS.green, 0, 0.5, true));
+            return particles;
+        }
+        case 'attractor': {
+            // Cycle
+            const particles: Particle[] = [];
+            for(let i=0; i<8; i++) {
+                const ang = (i/8) * Math.PI*2;
+                particles.push(mkP(i, cx + Math.cos(ang)*100, cy + Math.sin(ang)*100, COLORS.purple, 1, 0.5, false, i));
+            }
+            return particles;
+        }
+        case 'inhibition': {
+            // Excitatory stream blocked by Inhibitory wall
+            const particles: Particle[] = [];
+            // Stream
+            for(let i=0; i<10; i++) particles.push(mkP(i, 100 + i*30, cy, COLORS.green, 1, 0.5, false));
+            // Inhibitory Wall
+            for(let i=0; i<5; i++) particles.push(mkP(20+i, 400, cy - 60 + i*30, COLORS.red, 1, -0.5, true));
+            return particles;
+        }
+        case 'annealing': {
+            const particles: Particle[] = [];
+            for(let i=0; i<40; i++) {
+                particles.push(mkP(i, cx + (Math.random()-0.5)*400, cy + (Math.random()-0.5)*400, COLORS.orange, 1, 0.5, false));
+            }
+            return particles;
+        }
+        case 'superposition': {
+            // Two waves colliding
+            const particles: Particle[] = [];
+            for(let i=0; i<20; i++) particles.push(mkP(i, 100 + i*30, cy-50, COLORS.blue, 1, 0.5, true)); // Top wave
+            for(let i=0; i<20; i++) particles.push(mkP(20+i, 100 + i*30, cy+50, COLORS.blue, -1, 0.5, true)); // Bottom wave
+            return particles;
+        }
+        case 'invariance': {
+            // A triangle shape
+            const particles: Particle[] = [];
+            particles.push(mkP(0, cx, cy-100, COLORS.yellow, 1, 0.5, false));
+            particles.push(mkP(1, cx-86, cy+50, COLORS.yellow, 1, 0.5, false));
+            particles.push(mkP(2, cx+86, cy+50, COLORS.yellow, 1, 0.5, false));
+            return particles;
+        }
+        case 'morphogenesis': {
+            const particles: Particle[] = [];
+            // Initial circle
+            for(let i=0; i<12; i++) {
+                const ang = (i/12)*Math.PI*2;
+                particles.push(mkP(i, cx + Math.cos(ang)*50, cy + Math.sin(ang)*50, COLORS.green, 1, 0.5, false));
+            }
+            return particles;
+        }
+        default: {
+            // Default random swarm
+            const p = [];
+            for(let i=0; i<30; i++) {
+                p.push(mkP(i, cx + (Math.random()-0.5)*600, cy + (Math.random()-0.5)*400, COLORS.blue, Math.random(), 0.5, false));
+            }
+            return p;
+        }
     }
-    return [];
 };
