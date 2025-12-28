@@ -18,6 +18,10 @@ export const Step21: LessonStep = {
         </div>}
     ],
     config: p({ temperature: 5.0 }), setup: 'annealing', symbols: [],
-    script: [ { at: 10, type: 'shake', targetId: 'all', duration: 30 }, { at: 60, type: 'reset' }, { at: 70, type: 'annotate', label: "Settling" } ],
+    script: [ 
+        { at: 15, type: 'shake', targetId: 'all', duration: 40, label: "Thermal Noise" }, 
+        { at: 65, type: 'force', targetId: 'all', vector: {x:0, y:0}, label: "Cooling" }, 
+        { at: 85, type: 'annotate', label: "Global Minima" } 
+    ],
     narration: "Watch the energy dance on the screen. As particles rush into a deep valley of error, they pick up speed. They gain Kinetic Energy. They might even overshoot the bottom of the valley and roll up the other side before settling back down. This oscillation is not a bug; it is a vital feature. It represents a Temperature. This kinetic energy allows the system to escape local minima—those shallow little dips in the landscape that represent suboptimal solutions, \"good enough\" answers that aren't the \"best\" answer. A standard gradient descent algorithm acts like a zombie—it just walks downhill until it gets stuck in a pothole. Our particles act like skateboarders—they have momentum. They can use their speed to roll right out of those shallow traps and keep searching for the true global minimum. It is a physical implementation of Simulated Annealing. We are using the chaos of motion to find the stillness of truth."
 };

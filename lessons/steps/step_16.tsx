@@ -16,6 +16,10 @@ export const Step16: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'morphogenesis', symbols: [],
-    script: [ { at: 30, type: 'zoom', targetZoom: 0.8 }, { at: 50, type: 'spawn', targetId: 'all', label: "Growth" } ],
+    script: [ 
+        { at: 20, type: 'highlight', targetId: 'all', label: "Structure" }, 
+        { at: 50, type: 'spawn', targetId: 'all', label: "Growth" }, 
+        { at: 80, type: 'force', targetId: 'all', vector: {x:-0.5, y:-0.5}, label: "Densification" } 
+    ],
     narration: "In classical AI, the architecture of the network is a fossil. It is fixed by a human engineer before the software ever runs. The layers are set, the connections are defined. But here, we observe Morphogenesis—the biological development of form. The network grows. It adapts its own body. We discussed the equilibrium separation parameter earlier; well, the system can dynamically adjust this parameter based on local stress. If a region of the network is experiencing high error—high stress—it can contract. It pulls nodes closer together to increase bandwidth and reduce communication latency. It densifies the processing power where it is needed most, like a muscle tensing to lift a heavy weight. Conversely, in areas of low error, it can expand and relax, saving energy. This is \"Bioelectric Prepatterning.\" The hardware is evolving in real-time to fit the software. We are not just training a network; we are witnessing the embryogenesis of a connectome, growing and adapting to the challenges we throw at it."
 };

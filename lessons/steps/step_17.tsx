@@ -20,6 +20,10 @@ export const Step17: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'logic_gate', symbols: [],
-    script: [ { at: 20, type: 'pulse', targetId: 0, label: "Input A" }, { at: 40, type: 'pulse', targetId: 1, label: "Input B" }, { at: 60, type: 'highlight', targetId: 3, label: "Output" } ],
+    script: [ 
+        { at: 25, type: 'pulse', targetId: 0, label: "Input 1" }, 
+        { at: 45, type: 'pulse', targetId: 1, label: "Input 2" }, 
+        { at: 70, type: 'highlight', targetId: 3, label: "Logic Gate" } 
+    ],
     narration: "Can a fluid do logic? Can a swarm of fireflies perform algebra? The answer is Yes, if the geometry is right. While our paper deals with continuous differential equations and flowing probabilities, we can extrapolate digital logic from these analog curves. If we arrange the potential energy landscape correctly, we can build Logic Gates. Imagine a high ridge in the energy landscape that acts like a dam. It requires the combined push of two input particles to overcome the barrier and send water down the other side. That is an AND gate. Imagine a valley with two different entry points, where a single push from either side is enough to roll the ball down. That is an OR gate. Imagine using the repulsive force of anti-aligned spins to flip a signal from up to down. That is a NOT gate. We are building a Turing-complete computer, not out of silicon transistors and copper wire, but out of the topology of the energy landscape itself. The logic is not coded; it is sculpted into the hills and valleys of the physics engine."
 };

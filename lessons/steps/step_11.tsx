@@ -18,6 +18,10 @@ export const Step11: LessonStep = {
         </div>}
     ],
     config: p({ damping: 0.99 }), setup: 'attractor', symbols: [],
-    script: [ { at: 10, type: 'force', targetId: 'all', vector: {x:2, y:2} }, { at: 60, type: 'annotate', label: "Conservation" } ],
+    script: [ 
+        { at: 20, type: 'shake', targetId: 'all', duration: 20, label: "High Energy" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:3, y:3}, label: "Momentum" }, 
+        { at: 80, type: 'reset', label: "Ground State" } 
+    ],
     narration: "If there is a supreme ruler in this simulation, a god of the machine, it is the Hamiltonian. In physics, the Hamiltonian represents the Total Energy of a system—the sum of its Kinetic Energy (the energy of motion) and its Potential Energy (the energy of position and structure). This single quantity rules everything you see on the screen. It guarantees stability. Because we follow Hamiltonian dynamics, we adhere to conservation laws. The system cannot just spiral out of control; it has a budget. It trades energy back and forth between motion and error. When the system is confused, it has high Potential Energy (high error). As it starts to solve the problem, that potential energy is converted into Kinetic Energy—the particles speed up, they fly around, they explore. Then, as they settle into the solution, that motion is dissipated by damping (friction) and the system comes to rest. We can track this trade-off precisely. A learning system *needs* that Kinetic Energy. It needs the momentum to crash through barriers, to escape local traps, to jump out of the shallow valley of a \"good enough\" answer and find the deep canyon of the \"perfect\" answer. The computation ends when the physics settles."
 };

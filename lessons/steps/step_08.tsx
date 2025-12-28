@@ -18,6 +18,10 @@ export const Step08: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'grid', symbols: [],
-    script: [ { at: 30, type: 'zoom', targetZoom: 0.9 }, { at: 60, type: 'annotate', label: "Learning = Motion" } ],
+    script: [ 
+        { at: 25, type: 'highlight', targetId: 'all', label: "Distance" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:-1, y:-1}, label: "Learning" }, 
+        { at: 80, type: 'annotate', label: "Knowledge Crystal" } 
+    ],
     narration: "How do we measure \"closeness\" in a mind? In a social network, you are \"close\" to someone if you message them often, even if they live on the other side of the planet. But in the L-Group framework, we take \"closeness\" literally. We use a Euclidean Metric. Interaction strength decays with physical distance. This means that if two concepts need to be associated—if \"Fire\" implies \"Hot\"—the particles representing those concepts must literally, physically move closer together. This is a radical shift. In traditional AI, \"learning\" means changing a value in a matrix. It’s an abstract, invisible mathematical operation. Here, learning is Motion. It is a kinetic process. To learn a new pattern, the network must reshape itself. It must morph. It creates a physical geometry that mirrors the logical structure of the data. If you were to look at the shape of the network after training, you would see a physical map of the knowledge it possesses. The topology of the mind takes the shape of the problem it is solving. To understand the data, the network becomes the data."
 };

@@ -17,6 +17,11 @@ export const Step26: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'kuramoto_sync', symbols: [],
-    script: [ { at: 40, type: 'shake', targetId: 'all' }, { at: 60, type: 'annotate', label: "Phase Transition" } ],
+    script: [ 
+        { at: 25, type: 'shake', targetId: 'all', duration: 10, label: "Local Chaos" }, 
+        { at: 35, type: 'force', targetId: 'all', vector: {x:0, y:0}, label: "Global Order" }, 
+        { at: 55, type: 'highlight', targetId: 'center', label: "Criticality" },
+        { at: 75, type: 'pulse', targetId: 'all', label: "Edge of Chaos" } 
+    ],
     narration: "Every agent in a society faces a dilemma: do I conform to my immediate neighbors, or do I serve the global good? Our particles face the same choice. We decompose the prediction error into two components: a Local Error and a Global Error. The Local Error measures the disagreement with immediate neighbors—peer pressure. The Global Error measures the deviation from the cluster's centroid—the mandate from above. Balancing these two terms puts the system at a state of Criticality. If the local term dominates, you get chaos, noise, and incoherence. If the global term dominates, you get rigid groupthink and a lack of detail. By surfing the edge between these two, the intelligent system maintains enough order to exist, but enough plasticity to adapt. It is the sweet spot of complexity, the edge of chaos where life thrives."
 };

@@ -18,6 +18,10 @@ export const Step12: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'error_landscape', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 'all', vector: {x:0, y:5} }, { at: 60, type: 'annotate', label: "Rolling Downhill" } ],
+    script: [ 
+        { at: 30, type: 'force', targetId: 'all', vector: {x:0, y:8}, label: "Gravity" }, 
+        { at: 60, type: 'highlight', targetId: 'all', label: "Acceleration" }, 
+        { at: 90, type: 'annotate', label: "Convergence" } 
+    ],
     narration: "You are watching a physical manifestation of the most famous algorithm in machine learning: Gradient Descent. In a normal computer, this is a dry calculus operation performed in the dark recesses of a GPU. It calculates the slope of a curve and updates a number. But here? Here, it is Gravity. The spatial update rule dictates that a particle's velocity is proportional to the slope of the error landscape. If a particle is in a state of high error, it \"feels\" a steep slope beneath its feet. It accelerates. It rushes down the gradient, picking up speed. As the error decreases, the slope flattens out, and the particle naturally slows down. This \"Gravity for Data\" does something remarkable: it localizes the learning rule. A particle doesn't need to know what the billion other particles are doing; it just needs to feel the slope under its own feet. It acts locally to achieve a global goal. This makes the system biologically plausible—neurons in your brain don't have access to a global master plan; they just respond to the chemical gradients in their immediate vicinity. And yet, from this local gravity, global intelligence emerges."
 };

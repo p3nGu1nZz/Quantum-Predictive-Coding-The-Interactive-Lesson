@@ -18,6 +18,10 @@ export const Step28: LessonStep = {
         </div>}
     ],
     config: p({ spinEnabled: true }), setup: 'spin_cluster', symbols: [],
-    script: [ { at: 10, type: 'highlight', targetId: 'all' }, { at: 50, type: 'force', targetId: 'all', vector: {x: 5, y: 0} } ],
+    script: [ 
+        { at: 20, type: 'highlight', targetId: 'all', label: "Multiplexing" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:4, y:0}, label: "Orthogonal Flow" }, 
+        { at: 80, type: 'annotate', label: "No Crosstalk" } 
+    ],
     narration: "How do you process multiple streams of data in the same chunk of tissue without them becoming a garbled mess? We use Spin Coupling. By assigning orthogonal spins to different groups of particles, we create invisible channels. Green particles (Spin Up) interact strongly with other Green particles. Orange particles (Spin Down) interact with other Orange particles. But Green and Orange? They pass right through each other like ghosts. They occupy the same space, but they exist in different realities. This is Code Division Multiple Access (CDMA) for the brain—the same technology your cell phone uses to find your call in a room full of radio waves. It allows us to layer parallel realities within a single computing volume. We can process vision, sound, and memory in the same physical space, at the same time, without interference. It is density through dimensionality."
 };

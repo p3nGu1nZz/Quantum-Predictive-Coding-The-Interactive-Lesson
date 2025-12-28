@@ -17,6 +17,10 @@ export const Step24: LessonStep = {
         </div>}
     ],
     config: p({ couplingEnabled: true }), setup: 'fluid_flow', symbols: [],
-    script: [ { at: 10, type: 'pulse', targetId: 0 }, { at: 60, type: 'annotate', label: "Flux" } ],
+    script: [ 
+        { at: 20, type: 'force', targetId: 'all', vector: {x:2, y:0.5}, label: "Flow" }, 
+        { at: 50, type: 'highlight', targetId: 'all', label: "Flux" }, 
+        { at: 80, type: 'annotate', label: "Continuity" } 
+    ],
     narration: "Information in this system behaves like a fluid. We define a Probability Current density to describe the flow of activation through the network. This isn't just a metaphor; we strictly enforce the Continuity Equation derived from the Schrödinger equation. This equation states that probability cannot be created or destroyed, only moved. If activation disappears from one region, it must flow into another. This allows us to visualize the \"cognitive pipeline\" like a plumbing system. We can look at the flow fields and spot exactly where information flows freely, where it eddies and gets stuck, and where it bottlenecks. We are no longer just analyzing abstract code; we are modeling the Hydrodynamics of Thought. We can engineer the flow of ideas just as an engineer designs the flow of water through a turbine."
 };

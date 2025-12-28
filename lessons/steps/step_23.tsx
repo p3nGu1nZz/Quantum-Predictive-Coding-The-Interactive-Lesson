@@ -21,6 +21,10 @@ export const Step23: LessonStep = {
         </div>}
     ],
     config: p({ couplingEnabled: true }), setup: 'quantum_potential', symbols: [],
-    script: [ { at: 10, type: 'force', targetId: 'all', vector: {x: 5, y: 0} }, { at: 50, type: 'annotate', label: "Wavelength Shrink" } ],
+    script: [ 
+        { at: 25, type: 'force', targetId: 'all', vector: {x:5, y:5}, label: "High Momentum" }, 
+        { at: 35, type: 'annotate', label: "Short Wavelength" }, 
+        { at: 70, type: 'reset', label: "Long Wavelength" } 
+    ],
     narration: "Now we get truly quantum. We incorporate a correction term based on the De Broglie Wavelength. In quantum mechanics, every particle is also a wave, and its wavelength is inversely proportional to its momentum. Think about what that means. Fast-moving particles have short, frantic wavelengths. Slow, stable particles have long, rolling wavelengths. We use this to modulate coupling. When a particle is moving fast—meaning it has high error, high surprise, and is learning quickly—its wavelength shrinks. It becomes short-sighted. It only talks to its immediate neighbors. It focuses on the local details. When a particle settles down and becomes stable, its wavelength expands. It begins to tunnel across the network, connecting with distant nodes. This acts as an automatic, variable-scope Attention Mechanism. The system focuses on the pixels when it is confused, and integrates the big picture when it is calm."
 };

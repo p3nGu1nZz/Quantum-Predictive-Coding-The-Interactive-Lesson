@@ -18,6 +18,10 @@ export const Step30: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.5 }), setup: 'elastic_lattice', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 0, vector: {x: 5, y: 0} }, { at: 30, type: 'highlight', targetId: 'all', label: "Instant" } ],
+    script: [ 
+        { at: 20, type: 'force', targetId: 0, vector: {x: 5, y: 0}, label: "Perturbation" }, 
+        { at: 30, type: 'highlight', targetId: 'all', label: "Phonon Wave" }, 
+        { at: 60, type: 'annotate', label: "Instant Response" } 
+    ],
     narration: "In a gas, if you push a particle, it bumps its neighbor, which bumps the next one. The signal travels slowly, restricted by the speed of sound. But in a solid, if you push one end of a steel rod, the other end moves almost instantly. Our network exhibits Nonlocal Elasticity. Because the potential energy field creates a stiff, coupled lattice, the system acts more like a solid crystal than a diffuse gas. A perturbation at the edge of the network travels as a phonon—a sound wave—through the potential field, alerting the core almost instantly. This explains how a deep biological network can react faster than simple chemical diffusion would allow. The network reacts as a single, rigid body due to the stiffness of the potential field. It is a hive mind where every member feels the touch of the others instantly."
 };

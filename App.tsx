@@ -33,6 +33,7 @@ export default function App() {
   const fetchingRef = useRef<Set<string>>(new Set());
   const ttsQueue = useRef<Array<() => Promise<void>>>([]);
   const isProcessingQueue = useRef(false);
+  const isQuotaExceeded = useRef(false); // Circuit breaker for API limits
 
   const latestParticlesRef = useRef<Particle[]>(particles);
   const isUpdatingRef = useRef(false);
@@ -85,6 +86,8 @@ export default function App() {
 
   const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
       if (!process.env.API_KEY) return null;
+      if (isQuotaExceeded.current) return null; // Circuit breaker active
+
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const response = await ai.models.generateContent({
@@ -103,7 +106,14 @@ export default function App() {
               for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
               return bytes.buffer;
           }
-      } catch (e) { console.error("Gemini TTS Error:", e); }
+      } catch (e: any) { 
+          console.error("Gemini TTS Error:", e); 
+          // Check for 429 Resource Exhausted
+          if (e.toString().includes('429') || e.toString().includes('quota') || e.toString().includes('RESOURCE_EXHAUSTED')) {
+              console.warn("API Quota Exceeded. Disabling further TTS requests for this session.");
+              isQuotaExceeded.current = true;
+          }
+      }
       return null;
   };
 
@@ -128,13 +138,15 @@ export default function App() {
       } catch (e) {}
 
       // Fallback to API
-      const generatedBuffer = await generateSpeech(step.narration);
-      if (generatedBuffer) {
-          try {
-              const buffer = decodePCM(generatedBuffer, audioContextRef.current);
-              audioCacheRef.current.set(narrationKey, buffer);
-              return true;
-          } catch (e) { console.error(e); }
+      if (!isQuotaExceeded.current) {
+          const generatedBuffer = await generateSpeech(step.narration);
+          if (generatedBuffer) {
+              try {
+                  const buffer = decodePCM(generatedBuffer, audioContextRef.current);
+                  audioCacheRef.current.set(narrationKey, buffer);
+                  return true;
+              } catch (e) { console.error(e); }
+          }
       }
       return false;
   };
@@ -157,6 +169,8 @@ export default function App() {
 
   const fetchAudioForStep = async (step: LessonStep, stepIdx: number): Promise<void> => {
       if (!step.narration) return;
+      if (isQuotaExceeded.current) return; // Don't queue if quota exceeded
+
       const narrationKey = step.narration;
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       if (audioCacheRef.current.has(narrationKey) || fetchingRef.current.has(narrationKey)) return; 
@@ -169,15 +183,6 @@ export default function App() {
       });
   };
 
-  const processBackgroundAudio = async (steps: LessonStep[]) => {
-      for (let i = 0; i < steps.length; i++) {
-          const step = steps[i];
-          if (!step) continue;
-          fetchAudioForStep(step, LESSON_STEPS.indexOf(step));
-          await new Promise(r => setTimeout(r, 2000)); // Pace requests
-      }
-  };
-
   const handleTitleAction = async () => {
       if (initStatus === 'idle') {
           setInitStatus('loading');
@@ -188,10 +193,10 @@ export default function App() {
           const progressInterval = setInterval(() => {
               setLoadingProgress(prev => {
                   if (prev >= 95) return prev;
-                  // 100ms ticks. 600 ticks = 60s. 95 / 600 ≈ 0.158
-                  return prev + 0.16; 
+                  // Faster progress for UX
+                  return prev + 0.5; 
               });
-          }, 100);
+          }, 50);
           
           try {
               // Actual loading logic
@@ -199,8 +204,10 @@ export default function App() {
               await loadAudioImmediate(LESSON_STEPS[0], 0);
               setCacheVersion(v => v + 1);
 
-              // Start loading Step 2 in background
-              loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+              // Start loading Step 2 in background if possible
+              if (!isQuotaExceeded.current) {
+                  loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+              }
           } catch (e) {
               console.error("Audio Load Error:", e);
           } finally {
@@ -208,22 +215,27 @@ export default function App() {
               clearInterval(progressInterval);
               setLoadingProgress(100);
               setInitStatus('ready');
-              
-              setTimeout(() => {
-                  setHasStarted(true);
-                  processBackgroundAudio(LESSON_STEPS.slice(2));
-              }, 500);
+              // Wait for user to click "Enter Matrix"
           }
-      } 
+      } else if (initStatus === 'ready') {
+          // Play immediately
+          if (audioContextRef.current?.state === 'suspended') {
+              audioContextRef.current.resume();
+          }
+          setHasStarted(true);
+          // Only fetch next few steps, not all
+          // Removed processBackgroundAudio loop to save quota
+      }
   };
 
   useEffect(() => {
       if (!hasStarted) return;
-      // Ensure current step audio is ready (should be due to background loading, but verification)
+      
+      // Load Current Step
       const current = LESSON_STEPS[stepIndex];
       fetchAudioForStep(current, stepIndex);
       
-      // Preload next
+      // Preload NEXT Step only (Just-In-Time loading to save quota)
       const nextStep = LESSON_STEPS[stepIndex + 1];
       if (nextStep) {
           fetchAudioForStep(nextStep, stepIndex + 1);

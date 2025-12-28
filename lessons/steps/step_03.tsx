@@ -23,6 +23,12 @@ export const Step03: LessonStep = {
         </div>}
     ],
     config: p({ couplingEnabled: false }), setup: 'single_particle', symbols: [],
-    script: [ { at: 1, type: 'zoom', targetZoom: 3.0 }, { at: 35, type: 'highlight', targetId: 0, label: "POS" }, { at: 50, type: 'pulse', targetId: 0, label: "ACT" }, { at: 75, type: 'annotate', targetId: 0, label: "SPIN" } ],
+    script: [ 
+        { at: 5, type: 'zoom', targetZoom: 2.5 }, 
+        { at: 25, type: 'highlight', targetId: 0, label: "Position" }, 
+        { at: 45, type: 'pulse', targetId: 0, label: "Activation" }, 
+        { at: 65, type: 'highlight', targetId: 0, label: "Phase" }, 
+        { at: 85, type: 'annotate', label: "Spin" } 
+    ],
     narration: "Let's zoom in. Past the swarm, past the fluid dynamics, down to the fundamental grain of this reality: The Particle. In a standard neural network, a \"neuron\" is just a boring number in a spreadsheet. It sits there, waiting to be multiplied. But here? Here, a neuron is a vibrant, multidimensional entity. It is a citizen of a rich geometry we call Hilbert Space. Think of each particle as a tiny spaceship floating in a void. It has a Position, defined by coordinates in space, which determines who it can talk to and who it can hear. It has an Activation, which acts like the brightness of its engines—how loud it is shouting its current hypothesis. It has a Phase, a rhythmic pulse like a heartbeat, determining the timing of its communication. And it has an Intrinsic Spin, a quantum mechanical property that acts like a team jersey or a radio frequency, distinguishing it from different types of particles. By treating the neuron as a physical object with mass, momentum, and spin, we unlock the entire toolkit of modern physics. We can apply the Schrödinger equation—the same math that governs how electrons orbit an atom—to describe how a thought evolves in a mind. We are no longer just coding; we are doing cognitive physics."
 };

@@ -73,7 +73,7 @@ export interface QuizQuestion {
 export interface ScriptedEvent {
   at: number; // 0-100 percentage of narration
   duration?: number;
-  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset' | 'setTab' | 'zoom' | 'pan';
+  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset' | 'setTab' | 'zoom' | 'pan' | 'rotate';
   targetId?: number | 'all' | 'center'; 
   label?: string; 
   vector?: Vector2; 

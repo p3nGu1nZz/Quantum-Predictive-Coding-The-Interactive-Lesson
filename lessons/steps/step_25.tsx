@@ -17,6 +17,11 @@ export const Step25: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'adaptive_grid', symbols: [],
-    script: [ { at: 10, type: 'highlight', targetId: 'all' }, { at: 30, type: 'annotate', label: "Gain UP" }, { at: 70, type: 'annotate', label: "Gain DOWN" } ],
+    script: [ 
+        { at: 20, type: 'pulse', targetId: 'all', label: "Faint Signal" }, 
+        { at: 40, type: 'annotate', label: "High Gain" }, 
+        { at: 65, type: 'shake', targetId: 'all', duration: 10, label: "Loud Signal" }, 
+        { at: 80, type: 'annotate', label: "Low Gain" } 
+    ],
     narration: "Biological neurons are not static switches. They are adaptive. Think of your eye. In a dark room, your pupil dilates to capture every single photon. In bright sunlight, it constricts to prevent you from being blinded. This is Homeostasis. Our activation function does exactly this. It adapts its slope—its sensitivity—based on the local energy density. When the signal is faint, it steepens, increasing gain to amplify whispers. When the signal is loud, it flattens, decreasing gain to prevent saturation. Mathematically, this maximizes Fisher Information. It ensures the neuron is always operating in its most sensitive range, regardless of how loud or quiet the environment is. This allows the network to maintain optimal sensitivity across a massive dynamic range, distinguishing subtle patterns in the noise without getting blinded by the signal."
 };

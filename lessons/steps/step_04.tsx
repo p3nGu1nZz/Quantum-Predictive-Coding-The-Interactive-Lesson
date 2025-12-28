@@ -18,6 +18,10 @@ export const Step04: LessonStep = {
         </div>}
     ],
     config: p({ phaseEnabled: true }), setup: 'interference_grid', symbols: [],
-    script: [ { at: 10, type: 'pulse', targetId: 'all' }, { at: 50, type: 'highlight', targetId: 'center', label: "Cancellation" } ],
+    script: [ 
+        { at: 10, type: 'pulse', targetId: 'all' }, 
+        { at: 40, type: 'force', targetId: 'all', vector: {x:2, y:0}, label: "Interference" }, 
+        { at: 70, type: 'highlight', targetId: 'center', label: "Cancellation" } 
+    ],
     narration: "Look at the pulsing light of the nodes. This is Activation. In the digital world of zeros and ones, a bit is a switch. It’s either on or off. But in the physical world, things are rarely so binary. In our L-Group model, activation behaves like a wave on the ocean. It has height, it has power, and most importantly, it has a sign—positive or negative. This is crucial because it allows for the phenomenon of Interference. If you drop two pebbles in a pond, the ripples can pass through each other. Where a crest meets a crest, the wave doubles in size—this is constructive interference, an amplification of a thought. But where a crest meets a trough, they cancel out perfectly, leaving calm water. This is destructive interference. In our network, this allows for a powerful cognitive tool called \"explaining away.\" If the brain predicts a sound (a positive wave) and the ear hears that sound (a negative wave), they collide in the vacuum of the simulation and neutralize. Silence means success. Silence means the world is exactly as we expected. The particle's brightness is constantly being pushed and pulled by the \"force\" of prediction error, swelling and dimming as it tries to match the reality of the input. It is probability flowing like water."
 };

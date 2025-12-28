@@ -18,6 +18,10 @@ export const Step15: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'error_landscape', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 'all', vector: {x:0, y:2} }, { at: 60, type: 'annotate', label: "Minimizing" } ],
+    script: [ 
+        { at: 20, type: 'shake', targetId: 'all', duration: 30, label: "Surprise (High F)" }, 
+        { at: 60, type: 'reset', label: "Minimizing" }, 
+        { at: 80, type: 'highlight', targetId: 'all', label: "Prediction" } 
+    ],
     narration: "We return now to the philosophical core of our engine: The Free Energy Principle. In this context, \"Free Energy\" is just a physicist's fancy word for \"Surprise.\" The variable epsilon in our equations measures the raw difference between what the particle expected to happen and what actually happened. The biological imperative of this entire system—and Karl Friston would argue, the imperative of all life—is to minimize this quantity. Living things want to stay alive, and to stay alive, you need to be able to predict your environment. We want to make the world boring. We want to make it predictable. Computationally, the force acting on a particle is directly proportional to how surprised it is. High surprise generates high force. High force generates rapid movement and drastic reconfiguration. Low surprise generates low force, leading to stability and contentment. You are looking at an engine of prediction that consumes energy to reduce the entropy of its sensory inputs. It is constantly striving, shifting, and dancing to prove its own internal models correct."
 };

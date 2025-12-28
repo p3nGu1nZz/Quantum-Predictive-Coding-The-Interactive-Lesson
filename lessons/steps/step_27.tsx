@@ -17,6 +17,11 @@ export const Step27: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'cavity', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 0, vector: {x: 10, y: 10} }, { at: 50, type: 'annotate', label: "Correction" } ],
+    script: [ 
+        { at: 15, type: 'force', targetId: 'all', vector: {x: 0, y: 0}, label: "Gravity" }, 
+        { at: 40, type: 'highlight', targetId: 'center', label: "The Self" }, 
+        { at: 60, type: 'force', targetId: 'all', vector: {x: -1, y: -1}, label: "Correction" }, 
+        { at: 90, type: 'annotate', label: "Cohesion" } 
+    ],
     narration: "To prevent this swarm of independent agents from drifting apart into the void, we introduce a global correction vector. This term acts as a centripetal force, a specialized Gravity that pulls outliers back towards the center of mass of their assigned cluster. In cognitive terms, this is Top-Down Attention. It is the \"Self\" asserting coherence over its parts. The global cluster notices a wandering thought—a disconnected particle drifting away into irrelevance—and gently pulls it back into the main stream of consciousness. It ensures the integrity of the manifold, guaranteeing that even as the system explores and adapts and changes shape, it remains one cohesive entity. It is the glue that holds the mind together."
 };

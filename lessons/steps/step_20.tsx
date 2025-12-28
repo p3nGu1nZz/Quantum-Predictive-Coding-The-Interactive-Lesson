@@ -18,6 +18,10 @@ export const Step20: LessonStep = {
         </div>}
     ],
     config: p({ spinEnabled: true }), setup: 'inhibition', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 0, vector: {x: 5, y: 0} }, { at: 50, type: 'highlight', targetId: 20, label: "BLOCK" } ],
+    script: [ 
+        { at: 20, type: 'force', targetId: 0, vector: {x: 8, y: 0}, label: "Excitatory" }, 
+        { at: 45, type: 'highlight', targetId: 20, label: "Inhibition" }, 
+        { at: 60, type: 'reset', label: "Vetoed" } 
+    ],
     narration: "Every robust system needs a braking mechanism. A car needs brakes; a nuclear reactor needs control rods; a brain needs inhibition. We demonstrate this with a Feedforward Inhibition circuit. Imagine an excitatory signal—a \"Go\" command—rushing down a pathway. Simultaneously, a parallel pathway activates a cluster of Spin Down particles—our \"Inhibitory\" units. These particles exert a repulsive force on the main signal path. Mathematically, this acts like division or a shunt. It effectively short-circuits the actuator, clamping the output to zero regardless of how strong the input \"Go\" signal is. This is a Veto. It is a crucial architectural component for safety. It proves that mechanically, the power to stop is stronger than the power to go. It allows the system to focus, to select one action and suppress all others, and to shut down dangerous runaway feedback loops before they spiral out of control."
 };

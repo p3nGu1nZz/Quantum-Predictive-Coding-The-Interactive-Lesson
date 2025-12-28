@@ -153,6 +153,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     const forces: Vector2[] = new Array(n).fill(null).map(() => ({x: 0, y: 0}));
     const phaseDeltas: number[] = new Array(n).fill(0);
     
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+
     // Process Scripted Forces
     const activeEvents = script.filter(evt => {
         const end = evt.at + (evt.duration || 10);
@@ -160,24 +163,28 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     });
 
     activeEvents.forEach(evt => {
-        if (evt.type === 'force' && evt.vector) {
-            let targets: number[] = [];
-            if (evt.targetId === 'all') targets = ps.map(p => p.id);
-            else if (evt.targetId === 'center') targets = [0]; 
-            else if (typeof evt.targetId === 'number') targets = [evt.targetId];
-            else targets = [0, 1, 2, 3, 4]; // fallback
+        let targets: number[] = [];
+        if (evt.targetId === 'all') targets = ps.map(p => p.id);
+        else if (evt.targetId === 'center') targets = [0]; 
+        else if (typeof evt.targetId === 'number') targets = [evt.targetId];
 
-            targets.forEach(tid => {
-                const p = ps.find(part => part.id === tid);
-                if (p) {
-                    const idx = ps.indexOf(p);
-                    if (forces[idx]) {
-                        forces[idx].x += evt.vector!.x * 0.5; 
-                        forces[idx].y += evt.vector!.y * 0.5;
-                    }
-                }
-            });
-        }
+        targets.forEach(tid => {
+            const p = ps.find(part => part.id === tid);
+            if (!p) return;
+            const idx = ps.indexOf(p);
+            
+            if (evt.type === 'force' && evt.vector) {
+                forces[idx].x += evt.vector.x * 0.5; 
+                forces[idx].y += evt.vector.y * 0.5;
+            } else if (evt.type === 'rotate') {
+                // Apply tangential force relative to center
+                const dx = p.pos.x - cx;
+                const dy = p.pos.y - cy;
+                // Tangent is (-dy, dx)
+                forces[idx].x += -dy * 0.05;
+                forces[idx].y += dx * 0.05;
+            }
+        });
     });
 
     // Pairwise Interactions

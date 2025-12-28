@@ -77,7 +77,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                         )}
                         {initStatus === 'ready' && (
                             <>
-                                <span>Access Granted // Enter</span>
+                                <span>Enter Matrix</span>
                                 <ChevronRight size={24} />
                             </>
                         )}

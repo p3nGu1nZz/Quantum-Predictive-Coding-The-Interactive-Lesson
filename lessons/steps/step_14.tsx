@@ -18,6 +18,10 @@ export const Step14: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'mean_field', symbols: [],
-    script: [ { at: 40, type: 'highlight', targetId: 'center', label: "Aggregation" } ],
+    script: [ 
+        { at: 25, type: 'shake', targetId: 'all', duration: 10, label: "Noise" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:0, y:0}, label: "Aggregation" }, 
+        { at: 80, type: 'annotate', label: "Consensus" } 
+    ],
     narration: "How does a particle decide what to \"believe\"? It takes a poll. The prediction error term in our equations represents a discrepancy between the particle's own state and the consensus of its neighbors. This is known in physics as a Mean Field Approximation. The particle effectively asks, \"What is everyone around me doing?\" It aggregates the weighted opinions of its local cluster. If the cluster is shouting \"Fire!\", and the particle is whispering \"Water,\" the sheer force of the group's prediction will drag the particle's state toward \"Fire.\" This aggregation acts as a powerful noise filter. A single erratic particle screaming nonsense is ignored, drowned out by the collective mass. But if the whole group shifts, the collective state changes. This update rule, combined with the vibrational coupling we discussed earlier, drives the internal state toward a value that minimizes the global prediction error. It is democracy at the atomic level, ensuring that the system converges on a coherent, shared interpretation of the signal, rather than fracturing into a billion individual delusions."
 };

@@ -17,6 +17,10 @@ export const Step10: LessonStep = {
         </div>}
     ],
     config: p({ k: 0.2 }), setup: 'grid', symbols: [],
-    script: [ { at: 40, type: 'annotate', label: "Individuality" }, { at: 65, type: 'annotate', label: "Cohesion" } ],
+    script: [ 
+        { at: 15, type: 'highlight', targetId: 'all', label: "Springs" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:0, y:0}, label: "Tension" }, 
+        { at: 80, type: 'annotate', label: "Equilibrium" } 
+    ],
     narration: "At the very heart of our interaction model sits the humble spring. It is the most fundamental object in physics—the Harmonic Oscillator. We model the connection between any two particles not as a rigid beam, but as an elastic spring. The math is simple: the energy scales with the square of the distance from a \"happy medium,\" or equilibrium point. If the particles get too close, the spring compresses and pushes them apart. This represents Individuality—it prevents the system from collapsing into a black hole of singularity where all distinction is lost. If they drift too far apart, the spring stretches and pulls them back together. This represents Cohesion—it keeps the cluster alive as a unified entity. But here is the magic twist: that \"equilibrium distance\" is not fixed. The system actively optimizes it. It’s like a spring that can decide how long it wants to be. The network searches for the perfect packing density that minimizes the total tension. It is constantly trying to relax into a crystal-like stability, balancing the forces of attraction and repulsion to find a comfortable geometric shape that represents the answer to your question. It is a geometry of compromise, finding the lowest energy state between the need to be oneself and the need to be part of the whole."
 };

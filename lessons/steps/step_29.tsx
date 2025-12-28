@@ -18,6 +18,10 @@ export const Step29: LessonStep = {
         </div>}
     ],
     config: p({ phaseEnabled: true }), setup: 'kuramoto_sync', symbols: [],
-    script: [ { at: 10, type: 'pulse', targetId: 'all' }, { at: 70, type: 'annotate', label: "AHA!" } ],
+    script: [ 
+        { at: 15, type: 'shake', targetId: 'all', duration: 20, label: "Confusion" }, 
+        { at: 50, type: 'pulse', targetId: 'all', label: "Phase Lock" }, 
+        { at: 75, type: 'annotate', label: "Insight (Order=1)" } 
+    ],
     narration: "How do we know when the system has \"understood\" something? We measure synchrony. We use the Kuramoto Order Parameter to track the phase alignment of the particles. When the system is confused, the phases are chaotic, random, out of sync. It is noise. The Order Parameter is near zero. But as the system solves the problem, as the error minimizes, something magical happens. The phases begin to lock. A wave of synchronization sweeps through the network. The Order Parameter shoots up to one. This phase transition is the physical correlate of the \"Aha!\" moment—the moment of insight. We use this signal to gate learning: we only consolidate memories when the system is synchronized. As the saying goes: \"He who syncs, links.\" We only remember the moments where the world made sense."
 };

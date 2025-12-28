@@ -18,6 +18,10 @@ export const Step06: LessonStep = {
         </div>}
     ],
     config: p({ spinEnabled: true }), setup: 'spin_cluster', symbols: [],
-    script: [ { at: 10, type: 'highlight', targetId: 'all' }, { at: 55, type: 'force', targetId: 'all', vector: {x: 5, y: 0} }, { at: 75, type: 'annotate', label: "Pass-Through" } ],
+    script: [ 
+        { at: 20, type: 'highlight', targetId: 'all', label: "Spin States" }, 
+        { at: 50, type: 'force', targetId: 'all', vector: {x:5, y:0}, label: "Channel A" }, 
+        { at: 70, type: 'annotate', label: "Pass-Through" } 
+    ],
     narration: "Here is where we get truly quantum. We introduce the concept of Spin. In the subatomic world, particles like electrons have a property called spin—often described as \"up\" or \"down.\" It doesn't mean they are literally spinning like tops, but it defines how they interact with magnetic fields. In our cognitive simulation, we use Spin as a way to create invisible channels of communication. Imagine being in a crowded room where half the people speak English and half speak French. You can stand right next to a French speaker, but if you only speak English, their words pass right through you. You are in the same space, but in different \"channels.\" We assign our particles a spin value—Spin Up or Spin Down. Our equations dictate that particles with parallel spins amplifies each other's signal, while particles with opposite spins ignore or even repel each other. This is called Biological Multiplexing. It allows us to layer multiple independent computations on top of each other in the same physical volume. We can process the color of an image on the \"Up\" channel and the motion of the image on the \"Down\" channel, simultaneously, without the signals ever getting garbled. It’s how the brain packs so much processing power into such a small space."
 };

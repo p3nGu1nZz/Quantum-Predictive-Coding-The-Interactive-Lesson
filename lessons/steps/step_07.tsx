@@ -17,6 +17,10 @@ export const Step07: LessonStep = {
         </div>}
     ],
     config: p({ r0: 100 }), setup: 'cavity', symbols: [],
-    script: [ { at: 20, type: 'force', targetId: 'all', vector: {x:5, y:5} }, { at: 75, type: 'annotate', label: "Reflected Wave" } ],
+    script: [ 
+        { at: 15, type: 'force', targetId: 'all', vector: {x:5, y:5}, label: "Expansion" }, 
+        { at: 45, type: 'shake', targetId: 'all', duration: 10, label: "Reflection" }, 
+        { at: 80, type: 'zoom', targetZoom: 0.8, label: "Compression" } 
+    ],
     narration: "Physics teaches us that infinite space is boring. If you release a gas into an infinite void, the particles just fly away from each other forever. They cool down. They die. Entropy wins. To have structure, you need a container. You need a Cavity. In our simulation, the boundary is not just a limit; it is an active participant. When a particle emits a probability wave, it strikes the wall and reflects back. This creates a standing wave—a pressure field that forces the system to confront itself. This is non-local awareness. A particle on the left 'knows' about the wall on the right because the pressure wave connects them. This mechanism mirrors the biological necessity of cortical folding. The brain is a massive sheet of tissue crinkled into the finite volume of the skull. This folding doesn't just save space; it creates resonance chambers. It forces distant neurons into close proximity, creating 'wormholes' for information. The skull forces the mind to fold in on itself, generating the high-energy density required for consciousness. Creativity, it turns out, requires boundaries."
 };

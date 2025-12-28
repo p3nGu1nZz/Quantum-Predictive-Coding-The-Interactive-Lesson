@@ -17,6 +17,10 @@ export const Step19: LessonStep = {
         </div>}
     ],
     config: p({ phaseEnabled: true }), setup: 'superposition', symbols: [],
-    script: [ { at: 30, type: 'force', targetId: 'all', vector: {x: 2, y: 0} }, { at: 60, type: 'annotate', label: "Summation" } ],
+    script: [ 
+        { at: 30, type: 'force', targetId: 'all', vector: {x: 3, y: 0}, label: "Wave A" }, 
+        { at: 35, type: 'force', targetId: 'all', vector: {x: 0, y: 3}, label: "Wave B" }, 
+        { at: 70, type: 'annotate', label: "Instant Sum" } 
+    ],
     narration: "Nature does not do binary arithmetic. Nature does not \"carry the one.\" Nature performs mathematics by Superposition. In our prediction equation, the predicted state is simply the summation of weighted inputs. In a digital computer, summing a thousand numbers is a sequential, costly operation—step 1, step 2, step 3. In physics, it is the default state. When a thousand waves hit a beach, they sum up instantly. They don't wait for a CPU cycle. The central node in our network calculates the weighted sum of all its inputs simply by settling into the equilibrium point of the forces acting upon it. This is Analog Computing. It happens in constant time, with infinite precision, limited only by thermal noise. We are harnessing the linearity of wave mechanics to perform massive matrix algebra for free. We are getting the universe to do our homework for us, instantly, just by letting nature take its course."
 };
