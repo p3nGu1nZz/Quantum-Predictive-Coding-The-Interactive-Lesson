@@ -10,7 +10,7 @@ export const Step17: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Computation", content: <p>Can a fluid compute? Yes, by sculpting the topology of the potential energy landscape.</p> },
-        { at: 40, title: "Energy Barriers", content: <div className="space-y-4">
+        { at: 40, title: "Geomteric Logic", content: <div className="space-y-4">
             <p>We construct boolean logic (0/1) from continuous physics using <strong>Energy Barriers</strong> in the potential field <InlineMath math="V(\mathbf{r})" />:</p>
             <ul className="list-disc pl-5 space-y-2">
                 <li><strong>AND Gate:</strong> A high potential ridge requiring the summed kinetic energy of two inputs to surmount.</li>

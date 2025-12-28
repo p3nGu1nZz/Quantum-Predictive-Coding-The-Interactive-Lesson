@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -10,10 +11,10 @@ export const Step29: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Insight", content: <p>The "Aha!" moment is a phase transition from chaos to order.</p> },
-        { at: 40, title: "The Order Parameter", content: <div className="space-y-4">
-            <p>We quantify "understanding" using the <strong>Kuramoto Order Parameter</strong> <span className="font-math">R</span>:</p>
+        { at: 40, title: "Synchronization", content: <div className="space-y-4">
+            <p>We quantify "understanding" using the <strong>Kuramoto Order Parameter</strong> <InlineMath math="R" />:</p>
             <MathBlock>{'R e^{i \\Psi} = \\frac{1}{N} \\sum_{j=1}^{N} e^{i \\theta_j}'}</MathBlock>
-            <p><span className="font-math">R \approx 0</span> represents noise and confusion. <span className="font-math">R \approx 1</span> represents synchronization and insight. The moment of learning is a <strong>Thermodynamic Phase Transition</strong>. We use this signal to gate Hebbian plasticity—meaning we only "save" the memory when the network successfully clicks into place ("He who syncs, links").</p>
+            <p><InlineMath math="R \approx 0" /> represents noise and confusion. <InlineMath math="R \approx 1" /> represents synchronization and insight. The moment of learning is a <strong>Thermodynamic Phase Transition</strong>. We use this signal to gate Hebbian plasticity—meaning we only "save" the memory when the network successfully clicks into place ("He who syncs, links").</p>
         </div>}
     ],
     config: p({ phaseEnabled: true }), setup: 'kuramoto_sync', symbols: [],

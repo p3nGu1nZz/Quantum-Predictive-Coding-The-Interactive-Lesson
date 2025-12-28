@@ -26,7 +26,6 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Vector2>({ x: 0, y: 0 });
   
-  // No longer using tabs, but dynamic subsections
   const [activeSubsectionIndex, setActiveSubsectionIndex] = useState(0); 
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
@@ -62,7 +61,6 @@ export default function App() {
   }, [currentPlaybackProgress, currentStep.subsections]);
 
   const handleScriptTrigger = (evt: ScriptedEvent) => {
-      // setTab event removed/ignored in favor of time-based switch
       if (evt.type === 'zoom' && evt.targetZoom !== undefined) setZoom(evt.targetZoom);
       if (evt.type === 'pan' && evt.targetPan !== undefined) setPan(evt.targetPan);
       if (evt.type === 'reset') { setZoom(1); setPan({x:0, y:0}); }
@@ -84,22 +82,6 @@ export default function App() {
     }
     return audioBuffer;
   }
-
-  const processQueue = async () => {
-    if (isProcessingQueue.current || ttsQueue.current.length === 0) return;
-    isProcessingQueue.current = true;
-    const task = ttsQueue.current.shift();
-    if (task) { try { await task(); } catch (e) { console.error("Queue task failed", e); } }
-    setTimeout(() => {
-        isProcessingQueue.current = false;
-        if (ttsQueue.current.length > 0) processQueue();
-    }, 500);
-  };
-
-  const enqueueTask = (task: () => Promise<void>) => {
-      ttsQueue.current.push(task);
-      processQueue();
-  };
 
   const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
       if (!process.env.API_KEY) return null;
@@ -125,54 +107,74 @@ export default function App() {
       return null;
   };
 
-  const fetchAudioForStep = async (step: LessonStep, stepIdx: number): Promise<void> => {
-      if (!step.narration) return;
+  // Helper to get audio without queueing (for immediate initialization)
+  const loadAudioImmediate = async (step: LessonStep, stepIdx: number): Promise<boolean> => {
+      if (!step.narration) return true;
       const narrationKey = step.narration;
-      
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCacheRef.current.has(narrationKey) || fetchingRef.current.has(narrationKey)) return; 
-      
-      fetchingRef.current.add(narrationKey);
-      
+      if (audioCacheRef.current.has(narrationKey)) return true;
+
+      // Try local file first
       try {
           const paddedIndex = (stepIdx + 1).toString().padStart(2, '0');
           const filePath = `audio/step_${paddedIndex}.mp3`; 
           const response = await fetch(filePath);
           if (response.ok) {
               const arrayBuffer = await response.arrayBuffer();
-              if (audioContextRef.current) {
-                  const buffer = await decodeFileAudioData(arrayBuffer, audioContextRef.current);
-                  audioCacheRef.current.set(narrationKey, buffer);
-                  setCacheVersion(v => v + 1);
-                  fetchingRef.current.delete(narrationKey);
-                  return;
-              }
+              const buffer = await decodeFileAudioData(arrayBuffer, audioContextRef.current);
+              audioCacheRef.current.set(narrationKey, buffer);
+              return true;
           }
       } catch (e) {}
 
+      // Fallback to API
+      const generatedBuffer = await generateSpeech(step.narration);
+      if (generatedBuffer) {
+          try {
+              const buffer = decodePCM(generatedBuffer, audioContextRef.current);
+              audioCacheRef.current.set(narrationKey, buffer);
+              return true;
+          } catch (e) { console.error(e); }
+      }
+      return false;
+  };
+
+  const processQueue = async () => {
+    if (isProcessingQueue.current || ttsQueue.current.length === 0) return;
+    isProcessingQueue.current = true;
+    const task = ttsQueue.current.shift();
+    if (task) { try { await task(); } catch (e) { console.error("Queue task failed", e); } }
+    setTimeout(() => {
+        isProcessingQueue.current = false;
+        if (ttsQueue.current.length > 0) processQueue();
+    }, 500);
+  };
+
+  const enqueueTask = (task: () => Promise<void>) => {
+      ttsQueue.current.push(task);
+      processQueue();
+  };
+
+  const fetchAudioForStep = async (step: LessonStep, stepIdx: number): Promise<void> => {
+      if (!step.narration) return;
+      const narrationKey = step.narration;
+      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      if (audioCacheRef.current.has(narrationKey) || fetchingRef.current.has(narrationKey)) return; 
+      fetchingRef.current.add(narrationKey);
+
       enqueueTask(async () => {
-          const generatedBuffer = await generateSpeech(step.narration!);
-          if (generatedBuffer && audioContextRef.current) {
-              try {
-                  const buffer = decodePCM(generatedBuffer, audioContextRef.current);
-                  audioCacheRef.current.set(narrationKey, buffer);
-                  setCacheVersion(v => v + 1);
-              } catch (e) { console.error(e); }
-          }
-          fetchingRef.current.delete(narrationKey);
+         await loadAudioImmediate(step, stepIdx);
+         setCacheVersion(v => v + 1);
+         fetchingRef.current.delete(narrationKey);
       });
   };
 
   const processBackgroundAudio = async (steps: LessonStep[]) => {
-      const priority = [steps[0], steps[1], steps[2]].filter(Boolean);
-      for (const step of priority) {
-          await fetchAudioForStep(step, LESSON_STEPS.indexOf(step));
-      }
-      for (let i = 3; i < steps.length; i++) {
+      for (let i = 0; i < steps.length; i++) {
           const step = steps[i];
           if (!step) continue;
           fetchAudioForStep(step, LESSON_STEPS.indexOf(step));
-          await new Promise(r => setTimeout(r, 1000)); 
+          await new Promise(r => setTimeout(r, 2000)); // Pace requests
       }
   };
 
@@ -181,37 +183,51 @@ export default function App() {
           setInitStatus('loading');
           if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
           
-          let fakeProgress = 0;
-          const interval = setInterval(() => {
-             fakeProgress = Math.min(fakeProgress + Math.random() * 10, 95);
-             setLoadingProgress(fakeProgress);
-          }, 150);
-
-          await fetchAudioForStep(LESSON_STEPS[0], 0);
+          // Start fake progress simulation (Target 95% over 60 seconds)
+          const startTime = Date.now();
+          const progressInterval = setInterval(() => {
+              setLoadingProgress(prev => {
+                  if (prev >= 95) return prev;
+                  // 100ms ticks. 600 ticks = 60s. 95 / 600 ≈ 0.158
+                  return prev + 0.16; 
+              });
+          }, 100);
           
-          clearInterval(interval);
-          setLoadingProgress(100);
-          setInitStatus('ready');
-          
-          // Preload Step 2 during Step 1 init
-          fetchAudioForStep(LESSON_STEPS[1], 1); 
-          processBackgroundAudio(LESSON_STEPS.slice(2));
+          try {
+              // Actual loading logic
+              // Force load Step 1 immediately
+              await loadAudioImmediate(LESSON_STEPS[0], 0);
+              setCacheVersion(v => v + 1);
 
-      } else if (initStatus === 'ready') {
-          setHasStarted(true);
-      }
+              // Start loading Step 2 in background
+              loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+          } catch (e) {
+              console.error("Audio Load Error:", e);
+          } finally {
+              // Done
+              clearInterval(progressInterval);
+              setLoadingProgress(100);
+              setInitStatus('ready');
+              
+              setTimeout(() => {
+                  setHasStarted(true);
+                  processBackgroundAudio(LESSON_STEPS.slice(2));
+              }, 500);
+          }
+      } 
   };
 
   useEffect(() => {
       if (!hasStarted) return;
-      // Preload next step
+      // Ensure current step audio is ready (should be due to background loading, but verification)
+      const current = LESSON_STEPS[stepIndex];
+      fetchAudioForStep(current, stepIndex);
+      
+      // Preload next
       const nextStep = LESSON_STEPS[stepIndex + 1];
       if (nextStep) {
           fetchAudioForStep(nextStep, stepIndex + 1);
       }
-      // Ensure current is active
-      const current = LESSON_STEPS[stepIndex];
-      fetchAudioForStep(current, stepIndex);
   }, [stepIndex, hasStarted]);
 
   useEffect(() => {

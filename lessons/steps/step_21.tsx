@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -10,10 +11,10 @@ export const Step21: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Optimization", content: <p>Using thermal noise to escape local minima.</p> },
-        { at: 40, title: "Langevin Dynamics", content: <div className="space-y-4">
+        { at: 40, title: "Stochastic Dynamics", content: <div className="space-y-4">
             <p>We introduce a stochastic term (Noise) to the update rule, transforming it into a <strong>Langevin Equation</strong>:</p>
             <MathBlock>{'dp = -\\nabla V dt - \\gamma p dt + \\sqrt{2\\gamma k_B T} dW'}</MathBlock>
-            <p>Here, <span className="font-math">T</span> represents Temperature. High <span className="font-math">T</span> gives particles enough kinetic energy to "jump" over energy barriers and escape suboptimal solutions. As the system cools (<span className="font-math">T \to 0</span>), it settles into the global minimum. This is <strong>Simulated Annealing</strong>—using chaos to find order.</p>
+            <p>Here, <InlineMath math="T" /> represents Temperature. High <InlineMath math="T" /> gives particles enough kinetic energy to "jump" over energy barriers and escape suboptimal solutions. As the system cools (<InlineMath math="T \to 0" />), it settles into the global minimum. This is <strong>Simulated Annealing</strong>—using chaos to find order.</p>
         </div>}
     ],
     config: p({ temperature: 5.0 }), setup: 'annealing', symbols: [],

@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -10,10 +11,10 @@ export const Step20: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Control", content: <p>A brain without inhibition is a seizure. We implement safety vetos via negative feedback.</p> },
-        { at: 40, title: "Shunting Inhibition", content: <div className="space-y-4">
+        { at: 40, title: "Nonlinear Shunting", content: <div className="space-y-4">
             <p>We implement a "Veto" via <strong>Shunting Inhibition</strong>. Unlike subtractive inhibition, this acts as a divisor on the signal:</p>
             <MathBlock>{'\\frac{dx}{dt} = (E_{ex} - x) - g_{inh} (x - E_{inh})'}</MathBlock>
-            <p>Where <span className="font-math">{'g_{inh}'}</span> is the inhibitory conductance. If <span className="font-math">{'g_{inh}'}</span> is high, the output <span className="font-math">x</span> is clamped to zero regardless of the excitatory input. This nonlinear "division" allows for gain control and rapid shutdown of runaway processes.</p>
+            <p>Where <InlineMath math="g_{inh}" /> is the inhibitory conductance. If <InlineMath math="g_{inh}" /> is high, the output <InlineMath math="x" /> is clamped to zero regardless of the excitatory input. This nonlinear "division" allows for gain control and rapid shutdown of runaway processes.</p>
         </div>}
     ],
     config: p({ spinEnabled: true }), setup: 'inhibition', symbols: [],

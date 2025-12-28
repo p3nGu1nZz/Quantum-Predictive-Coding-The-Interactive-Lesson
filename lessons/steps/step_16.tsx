@@ -9,7 +9,7 @@ export const Step16: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Growth", content: <p>Classical AI has fixed architecture. Our system has <strong>Living Architecture</strong>. The hardware evolves in real-time to fit the software requirements.</p> },
-        { at: 40, title: "Bioelectric Prepatterning", content: <div className="space-y-4">
+        { at: 40, title: "Structural Plasticity", content: <div className="space-y-4">
             <p>We employ a dynamic equilibrium parameter <span className="font-math">r_0(t)</span> that responds to the local stress tensor (Error Density):</p>
             <p className="text-center font-mono bg-slate-800 p-2 rounded border border-slate-700">Stress <span className="text-cyan-400">∝</span> Prediction Error</p>
             <p>High local error triggers <strong>contraction</strong> (densification), creating high-bandwidth processing hubs. Low error triggers <strong>relaxation</strong> (rarefaction). This mimics biological morphogenesis, where bioelectric fields guide the physical growth of the embryo. The computer builds itself.</p>

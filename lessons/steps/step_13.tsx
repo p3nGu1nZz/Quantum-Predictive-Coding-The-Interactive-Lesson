@@ -1,6 +1,7 @@
 import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
+import { InlineMath } from '../../components/InlineMath';
 import { LessonStep } from '../../types';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
@@ -10,7 +11,7 @@ export const Step13: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Symmetry", content: <p>Cognition is a two-way street. We enforce Newton's Third Law: For every cognitive action, there is an equal and opposite reaction.</p> },
-        { at: 40, title: "Bidirectional Flow", content: <div className="space-y-4">
+        { at: 40, title: "Bidirectional Coupling", content: <div className="space-y-4">
             <p>Traditional neural networks often rely on feedforward architectures. The L-Group framework is strictly <strong>Reciprocal</strong>. The coupling matrix is symmetric:</p>
             <MathBlock>{'w_{ij} = w_{ji} \\quad \\Rightarrow \\quad \\mathbf{F}_{ij} = -\\mathbf{F}_{ji}'}</MathBlock>
             <p>This ensures a perfect balance between Bottom-Up signals (Sensation pushing on the Model) and Top-Down signals (The Model pushing on Sensation). This equilibrium prevents the system from detaching from reality (Hallucination) or ignoring prior knowledge (Blindness). It is the mathematical definition of a dialogue.</p>

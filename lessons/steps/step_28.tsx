@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -10,7 +11,7 @@ export const Step28: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Channels", content: <p>Processing multiple reality streams in the same physical space using Quantum Spin.</p> },
-        { at: 40, title: "Orthogonal Subspaces", content: <div className="space-y-4">
+        { at: 40, title: "Orthogonality", content: <div className="space-y-4">
             <p>We leverage the orthogonality of spin states to create independent communication channels:</p>
             <MathBlock>{'\\langle \\psi_{\\uparrow} | \\psi_{\\downarrow} \rangle = 0'}</MathBlock>
             <p>Particles with opposite spins pass through each other without interaction. This effectively creates <strong>Orthogonal Subspaces</strong> within the same manifold. It is the biological equivalent of <strong>CDMA (Code Division Multiple Access)</strong> used in cellular networks, allowing the brain to process color, motion, and depth simultaneously in the same volume of cortex without crosstalk.</p>
