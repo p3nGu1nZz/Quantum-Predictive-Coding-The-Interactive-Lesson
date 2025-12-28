@@ -709,24 +709,76 @@ export default function App() {
 
         {/* --- PARTICLE INSPECTOR (Canvas Overlay) --- */}
         {selectedParticle && (
-            <div className="absolute top-6 left-6 w-72 bg-slate-900/90 backdrop-blur-md rounded border border-cyan-500/30 shadow-2xl z-30 animate-fade-in-up p-5">
+            <div className="absolute top-6 left-6 w-80 bg-slate-900/95 backdrop-blur-md rounded-xl border border-cyan-500/30 shadow-[0_0_30px_rgba(0,0,0,0.5)] z-30 animate-fade-in-up p-6 font-mono">
                  <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
-                    <h4 className="text-cyan-400 font-bold flex items-center gap-2 cyber-font">
-                        <Microscope size={20} /> NODE_{selectedParticle.id}
+                    <h4 className="text-cyan-400 font-bold flex items-center gap-2 cyber-font text-lg">
+                        <Microscope size={18} /> NODE_{selectedParticle.id.toString().padStart(3, '0')}
                     </h4>
-                    <button onClick={() => setSelectedParticle(null)} className="text-slate-500 hover:text-white">&times;</button>
+                    <button onClick={() => setSelectedParticle(null)} className="text-slate-500 hover:text-white transition-colors">
+                        &times;
+                    </button>
                 </div>
-                <div className="space-y-3 text-sm text-slate-300">
-                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
-                        <span className="text-slate-400 uppercase text-xs tracking-wider">Activation (x)</span>
-                        <span className="font-mono text-cyan-300 font-bold text-lg">{selectedParticle.val.toFixed(3)}</span>
+                
+                <div className="space-y-3 text-xs md:text-sm text-slate-300">
+                    
+                    {/* Activation */}
+                    <div className="flex justify-between items-center bg-black/40 p-2 rounded border border-slate-800/50">
+                        <span className="text-slate-500 uppercase tracking-widest">Activation (x)</span>
+                        <div className="text-right">
+                             <span className="font-bold text-cyan-300 text-base">{selectedParticle.val.toFixed(3)}</span>
+                             {selectedParticle.valVel !== 0 && (
+                                <div className="text-[10px] text-slate-500">v: {selectedParticle.valVel.toFixed(3)}</div>
+                             )}
+                        </div>
                     </div>
-                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
-                        <span className="text-slate-400 uppercase text-xs tracking-wider">Spin (s)</span>
-                        <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                            {selectedParticle.spin > 0 ? 'UP (+1/2)' : 'DOWN (-1/2)'}
+
+                    {/* Predicted Value */}
+                    <div className="flex justify-between items-center bg-black/40 p-2 rounded border border-slate-800/50">
+                        <span className="text-slate-500 uppercase tracking-widest">Pred (x̂)</span>
+                        <span className="font-bold text-purple-300 text-base">
+                            {selectedParticle.predictedVal !== undefined ? selectedParticle.predictedVal.toFixed(3) : '--'}
                         </span>
                     </div>
+
+                    {/* Spin */}
+                    <div className="flex justify-between items-center bg-black/40 p-2 rounded border border-slate-800/50">
+                        <span className="text-slate-500 uppercase tracking-widest">Spin (s)</span>
+                        <span className={`font-bold text-base ${selectedParticle.spin > 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                            {selectedParticle.spin > 0 ? 'UP (+½)' : 'DOWN (-½)'}
+                        </span>
+                    </div>
+
+                    {/* Phase Info */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-black/40 p-2 rounded border border-slate-800/50">
+                            <span className="text-slate-500 text-[10px] uppercase block mb-1">Phase (φ)</span>
+                            <span className="text-slate-200 font-bold">{(selectedParticle.phase % (2*Math.PI)).toFixed(2)} rad</span>
+                        </div>
+                        <div className="bg-black/40 p-2 rounded border border-slate-800/50">
+                            <span className="text-slate-500 text-[10px] uppercase block mb-1">Phase Vel</span>
+                            <span className="text-slate-200 font-bold">{selectedParticle.phaseVel.toFixed(3)}</span>
+                        </div>
+                    </div>
+
+                    {/* Force Vector */}
+                    {selectedParticle.force && (
+                        <div className="bg-black/40 p-2 rounded border border-slate-800/50">
+                            <div className="flex justify-between items-end mb-1">
+                                <span className="text-slate-500 uppercase tracking-widest text-[10px]">Net Force</span>
+                                <span className="text-yellow-500 font-mono text-xs">
+                                    |F| = {Math.sqrt(selectedParticle.force.x**2 + selectedParticle.force.y**2).toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="flex gap-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="bg-red-500 h-full transition-all duration-300" style={{ width: `${Math.min(100, Math.abs(selectedParticle.force.x) * 10)}%` }}></div>
+                                <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${Math.min(100, Math.abs(selectedParticle.force.y) * 10)}%` }}></div>
+                            </div>
+                            <div className="flex justify-between text-[9px] text-slate-600 font-mono mt-1">
+                                <span>Fx: {selectedParticle.force.x.toFixed(2)}</span>
+                                <span>Fy: {selectedParticle.force.y.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         )}

@@ -222,26 +222,21 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         return playbackProgress >= evt.at && playbackProgress < end;
     });
 
-    // Apply Scripted Forces or Mutations
+    // Apply Scripted Forces (Global or Targeted)
     activeEvents.forEach(evt => {
         if (evt.type === 'force' && evt.vector) {
             let targets: number[] = [];
             if (evt.targetId === 'all') targets = ps.map(p => p.id);
-            else if (evt.targetId === 'center') targets = [0]; // Simplified: assume 0 is roughly center or specific
+            else if (evt.targetId === 'center') targets = [0]; 
             else if (typeof evt.targetId === 'number') targets = [evt.targetId];
-            else targets = [0, 1, 2]; // Default cluster
+            else targets = [0, 1, 2]; 
 
             targets.forEach(tid => {
                 if (forces[tid]) {
-                    forces[tid].x += evt.vector!.x * 2; // Strong push
+                    forces[tid].x += evt.vector!.x * 2; 
                     forces[tid].y += evt.vector!.y * 2;
                 }
             });
-        }
-        
-        if (evt.type === 'pulse') {
-             // Modulate scale or brightness
-             // We'll update the particle properties directly in the map loop below
         }
     });
 
@@ -251,17 +246,40 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
     // Apply Updates
     const nextParticles = ps.map((p, i) => {
-        // Handle Pulse/Visibility overrides from script
         let scale = 1.0;
         let visible = p.visible !== undefined ? p.visible : true;
         let activationMod = 0;
+        let shakeX = 0;
+        let shakeY = 0;
 
         activeEvents.forEach(evt => {
             const isTarget = evt.targetId === 'all' || evt.targetId === p.id || (evt.targetId === 'center' && i === 0);
             if (isTarget) {
-                if (evt.type === 'spawn') visible = true;
-                if (evt.type === 'pulse') scale = 1.5 + Math.sin(currentFrame * 0.2) * 0.3;
-                if (evt.type === 'highlight') scale = 1.3;
+                const duration = evt.duration || 10;
+                const localT = Math.max(0, Math.min(1, (playbackProgress - evt.at) / duration));
+
+                if (evt.type === 'spawn') {
+                    visible = true;
+                    // Ease out elastic effect for spawn
+                    if (localT < 1.0) {
+                        scale = Math.min(1.0, localT * 2); // Simple fade in/scale up
+                    }
+                }
+                if (evt.type === 'pulse') {
+                    // Smooth sine wave pulse
+                    scale = 1.0 + Math.sin(currentFrame * 0.2) * 0.3 * Math.sin(localT * Math.PI);
+                }
+                if (evt.type === 'highlight') {
+                    // Smooth swell and glow
+                    scale = 1.0 + 0.3 * Math.sin(localT * Math.PI);
+                    activationMod += 0.5 * Math.sin(localT * Math.PI); // Brighten
+                }
+                if (evt.type === 'shake') {
+                    // Vibrational noise
+                    const intensity = 3.0 * Math.sin(localT * Math.PI);
+                    shakeX += (Math.random() - 0.5) * intensity;
+                    shakeY += (Math.random() - 0.5) * intensity;
+                }
             }
         });
 
@@ -269,11 +287,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         if (!trailsRef.current.has(p.id)) trailsRef.current.set(p.id, []);
         const trail = trailsRef.current.get(p.id)!;
         
-        // Add point if moved enough or periodically
         const last = trail[trail.length - 1];
         if (!last || Math.abs(last.x - p.pos.x) > 1.0 || Math.abs(last.y - p.pos.y) > 1.0) {
             trail.push({ ...p.pos });
-            // Keep trails relatively short for performance, but long enough for visuals
             if (trail.length > 25) trail.shift();
         }
 
@@ -298,8 +314,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         const noiseX = gaussianRandom() * config.temperature;
         const noiseY = gaussianRandom() * config.temperature;
         
-        let newVelX = p.vel.x * config.damping + (forces[i].x * config.eta_r) + noiseX;
-        let newVelY = p.vel.y * config.damping + (forces[i].y * config.eta_r) + noiseY;
+        // Add shake force to velocity
+        let newVelX = p.vel.x * config.damping + (forces[i].x * config.eta_r) + noiseX + shakeX;
+        let newVelY = p.vel.y * config.damping + (forces[i].y * config.eta_r) + noiseY + shakeY;
         
         // --- STABILIZATION: CLAMP VELOCITY ---
         const maxVel = 5.0; 
