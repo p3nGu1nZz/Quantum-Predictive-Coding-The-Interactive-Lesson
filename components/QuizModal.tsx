@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { QuizQuestion } from '../types';
-import { CheckCircle, XCircle, BrainCircuit, SkipForward } from 'lucide-react';
+import { CheckCircle, XCircle, BrainCircuit, SkipForward, PowerOff } from 'lucide-react';
 import { COLORS } from '../constants';
 
 interface QuizModalProps {
   questionData: QuizQuestion;
   onComplete: () => void; // Called on Success
-  onSkip: () => void;     // Called on Skip (Fail)
+  onSkip: () => void;     // Called on Skip (Fail or Bypass)
+  onDisableQuizzes: () => void; // Called to permanently disable
 }
 
 // Simple particle for the explosion effect
@@ -50,7 +51,7 @@ class ConfettiParticle {
   }
 }
 
-export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, onSkip }) => {
+export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, onSkip, onDisableQuizzes }) => {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -119,7 +120,8 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, 
   }, []);
 
   return (
-    <div className="absolute inset-0 bg-black/95 z-[70] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in">
+    // Fixed positioning with z-index 100 ensures it sits on top of sidebar and everything else
+    <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 backdrop-blur-xl animate-fade-in cursor-default" onClick={(e) => e.stopPropagation()}>
       <canvas 
         ref={canvasRef} 
         width={800} 
@@ -174,7 +176,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, 
         {isCorrect === false && (
           <div className="mt-6 text-red-400 font-bold animate-pulse text-center">
              Incorrect. Reviewing protocols...
-             <button onClick={onSkip} className="block mt-2 text-sm text-slate-500 hover:text-white underline mx-auto">Skip Question (Record Failure)</button>
+             <button onClick={onSkip} className="block mt-2 text-sm text-slate-500 hover:text-white underline mx-auto">Skip Question</button>
           </div>
         )}
         
@@ -184,15 +186,25 @@ export const QuizModal: React.FC<QuizModalProps> = ({ questionData, onComplete, 
              </div>
         )}
 
-        {/* Skip Button (Only show if not answered yet) */}
-        {selectedAnswer === null && (
+        <div className="flex justify-between w-full mt-8 pt-4 border-t border-slate-800">
+             {/* Skip current button */}
+            {selectedAnswer === null && (
+                <button 
+                    onClick={onSkip}
+                    className="text-slate-500 hover:text-white flex items-center gap-2 text-sm uppercase tracking-widest transition-colors"
+                >
+                    <SkipForward size={16} /> Skip This
+                </button>
+            )}
+             
+            {/* Disable Future Quizzes */}
             <button 
-                onClick={onSkip}
-                className="mt-8 text-slate-500 hover:text-red-400 flex items-center gap-2 text-sm uppercase tracking-widest transition-colors"
+                onClick={onDisableQuizzes}
+                className="text-slate-600 hover:text-red-400 flex items-center gap-2 text-sm uppercase tracking-widest transition-colors ml-auto"
             >
-                <SkipForward size={16} /> Skip Verification (Penalty)
+                <PowerOff size={16} /> Disable All Quizzes
             </button>
-        )}
+        </div>
 
       </div>
     </div>

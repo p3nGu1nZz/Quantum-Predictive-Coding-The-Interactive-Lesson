@@ -12,6 +12,7 @@ export interface Particle {
   force?: Vector2;    // F_i (Accumulated Force) for prediction
   val: number;        // x_i (Internal State/Activation)
   valVel: number;     // dx_i/dt
+  predictedVal?: number; // x_hat_i (Predicted State)
   phase: number;      // phi_i (Vibrational Phase)
   phaseVel: number;   // dphi/dt
   spin: number;       // s_i (Intrinsic Spin: -0.5 or +0.5)
@@ -60,5 +61,6 @@ export interface LessonStep {
   setup: string;
   symbols: SymbolDefinition[];
   explanation?: React.ReactNode; // Extended educational content
+  narration?: string; // The text script for the AI narrator
   questions?: QuizQuestion[]; // Pool of questions for the transition quiz
 }

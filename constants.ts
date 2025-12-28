@@ -20,12 +20,12 @@ export const PHYSICS = {
   eta: 0.05,
   eta_r: 0.05,
   sigma: 100,
-  damping: 0.998, // Increased for longer oscillations
+  damping: 0.90, // Significantly increased friction (0.998 -> 0.90) for stability
   couplingEnabled: true,
   phaseEnabled: false,
   spinEnabled: false,
-  showGhosts: false, // Default to hidden
-  temperature: 0.9, // Increased for highly energetic Brownian motion
+  showGhosts: false, 
+  temperature: 0.2, // Reduced entropy (0.9 -> 0.2) to prevent chaotic mess
 };
 
 export const CANVAS_WIDTH = 800;

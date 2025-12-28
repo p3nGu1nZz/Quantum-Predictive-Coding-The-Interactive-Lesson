@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
-import { QuizModal } from './components/QuizModal'; // Imported
-import { Particle, Interaction, Vector2, QuizQuestion } from './types';
-import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
-import { Play, Pause, RefreshCw, ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, Info, ZoomIn, ZoomOut, Maximize, X, Plus, Minus, ScanEye, BookOpen, GraduationCap, List, Maximize2, Minimize2, HelpCircle, History, Award, AlertTriangle, RotateCcw } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { LESSON_STEPS } from './lessons/content';
+import { AudioNarrator } from './components/AudioNarrator'; 
+import { MatrixBackground } from './components/MatrixBackground'; 
+import { AdminPanel } from './components/AdminPanel';
+import { Particle, Interaction, Vector2, QuizQuestion, LessonStep } from './types';
 import { createParticles } from './lessons/setups';
+import { LESSON_STEPS } from './lessons/content';
+import { COLORS, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
+import { ChevronRight, ChevronLeft, Activity, Sparkles, Microscope, BookOpen, List, Award, RotateCcw, Loader2, Settings } from 'lucide-react';
+import { LineChart, Line, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { GoogleGenAI } from "@google/genai";
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(false); 
+  const [loadingProgress, setLoadingProgress] = useState(0);   
+  const [stepAudioProgress, setStepAudioProgress] = useState(0); 
+  const [cacheVersion, setCacheVersion] = useState(0); 
+  
   const [stepIndex, setStepIndex] = useState(0);
   const [particles, setParticles] = useState<Particle[]>(createParticles('grid'));
   const [isRunning, setIsRunning] = useState(true);
@@ -19,10 +27,12 @@ export default function App() {
   const [selectedParticle, setSelectedParticle] = useState<Particle | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Vector2>({ x: 0, y: 0 });
-  const [showHelp, setShowHelp] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
   const [predictionError, setPredictionError] = useState<number | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [quizzesEnabled, setQuizzesEnabled] = useState(true);
+  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   // Lesson State
   const [score, setScore] = useState({ correct: 0, total: 0 });
@@ -35,13 +45,240 @@ export default function App() {
     targetStep: number;
   }>({ active: false, question: null, targetStep: 0 });
 
+  // Audio Cache (In-Memory Layer)
+  const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const fetchingRef = useRef<Set<string>>(new Set());
+
+  // Generation Queue to prevent Rate Limiting
+  const ttsQueue = useRef<Array<() => Promise<void>>>([]);
+  const isProcessingQueue = useRef(false);
+
   // Refs
   const latestParticlesRef = useRef<Particle[]>(particles);
   const isUpdatingRef = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-
+  
   // Safe check for bounds
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
+
+  // Helper: Decode Standard Audio File (MP3/WAV)
+  async function decodeFileAudioData(data: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> {
+    return ctx.decodeAudioData(data);
+  }
+
+  // Helper: Decode Raw PCM Data (Gemini Output)
+  // Gemini 2.5 Flash TTS typically outputs 24kHz, 1 channel, 16-bit PCM
+  function decodePCM(buffer: ArrayBuffer, ctx: AudioContext): AudioBuffer {
+    const dataInt16 = new Int16Array(buffer);
+    const numChannels = 1; 
+    const sampleRate = 24000;
+    const frameCount = dataInt16.length; 
+    
+    const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    const channelData = audioBuffer.getChannelData(0);
+    
+    for (let i = 0; i < frameCount; i++) {
+        // Convert Int16 to Float32 [-1.0, 1.0]
+        channelData[i] = dataInt16[i] / 32768.0; 
+    }
+    return audioBuffer;
+  }
+
+  // --- AUDIO QUEUE PROCESSOR ---
+  const processQueue = async () => {
+    if (isProcessingQueue.current || ttsQueue.current.length === 0) return;
+    isProcessingQueue.current = true;
+    
+    const task = ttsQueue.current.shift();
+    if (task) {
+        try {
+            await task();
+        } catch (e) {
+            console.error("Queue task failed", e);
+        }
+    }
+    
+    // STRICT RATE LIMITING:
+    // Add a mandatory delay between requests to prevent 429 errors.
+    // 2000ms delay ensures we don't spam the server.
+    setTimeout(() => {
+        isProcessingQueue.current = false;
+        if (ttsQueue.current.length > 0) processQueue();
+    }, 2000); 
+  };
+
+  const enqueueTask = (task: () => Promise<void>) => {
+      ttsQueue.current.push(task);
+      processQueue();
+  };
+
+  const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
+      if (!process.env.API_KEY) {
+          console.warn("No API Key found for TTS generation.");
+          return null;
+      }
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash-preview-tts',
+              contents: [{ parts: [{ text }] }],
+              config: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                      voiceConfig: {
+                          prebuiltVoiceConfig: { voiceName: 'Kore' }
+                      }
+                  }
+              }
+          });
+          
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+              const binaryString = atob(base64Audio);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+              }
+              return bytes.buffer;
+          }
+      } catch (e) {
+          console.error("Gemini TTS Error:", e);
+      }
+      return null;
+  };
+
+  // --- AUDIO LOADING SYSTEM ---
+  
+  const fetchAudioForStep = async (step: LessonStep, stepIdx: number, onProgress?: (percent: number) => void): Promise<ArrayBuffer | undefined> => {
+      if (!step.narration) {
+          if (onProgress) onProgress(100);
+          return undefined;
+      }
+      
+      const narrationKey = step.narration;
+      
+      // Ensure AudioContext
+      if (!audioContextRef.current) {
+         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+
+      if (fetchingRef.current.has(narrationKey)) return undefined; // Busy
+      fetchingRef.current.add(narrationKey);
+
+      if (onProgress) onProgress(10);
+
+      // 1. Try Static File first (fastest)
+      try {
+          const paddedIndex = (stepIdx + 1).toString().padStart(2, '0');
+          // Sanitize title for filename
+          const safeTitle = step.title.split(':')[0].replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          const filePath = `audio/step_${paddedIndex}.mp3`; // Reverted to simple index for robustness
+          
+          const response = await fetch(filePath);
+          if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              if (audioContextRef.current) {
+                  // MP3s use the native browser decoder
+                  const buffer = await decodeFileAudioData(arrayBuffer, audioContextRef.current);
+                  audioCacheRef.current.set(narrationKey, buffer);
+                  setCacheVersion(v => v + 1);
+              }
+              if (onProgress) onProgress(100);
+              fetchingRef.current.delete(narrationKey);
+              return arrayBuffer;
+          }
+      } catch (e) {
+          // Fall through to generation
+      }
+
+      // 2. Generate with API (Queued)
+      return new Promise<ArrayBuffer | undefined>((resolve) => {
+          enqueueTask(async () => {
+              if (onProgress) onProgress(50);
+              const generatedBuffer = await generateSpeech(step.narration!);
+              
+              if (generatedBuffer) {
+                  if (audioContextRef.current) {
+                      try {
+                          // Generated audio is Raw PCM, use manual decoder
+                          const buffer = decodePCM(generatedBuffer, audioContextRef.current);
+                          audioCacheRef.current.set(narrationKey, buffer);
+                          setCacheVersion(v => v + 1);
+                      } catch (e) {
+                          console.error("PCM Decode failed", e);
+                      }
+                  }
+                  if (onProgress) onProgress(100);
+                  fetchingRef.current.delete(narrationKey);
+                  resolve(generatedBuffer);
+              } else {
+                  console.warn("Failed to generate audio for step " + (stepIdx + 1));
+                  if (onProgress) onProgress(0);
+                  fetchingRef.current.delete(narrationKey);
+                  resolve(undefined);
+              }
+          });
+      });
+  };
+
+  const processBackgroundAudio = async (steps: LessonStep[]) => {
+      // Load remaining steps
+      for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          const globalIdx = LESSON_STEPS.indexOf(step);
+          
+          if (audioCacheRef.current.has(step.narration || "")) continue; 
+          
+          fetchAudioForStep(step, globalIdx); 
+          await new Promise(r => setTimeout(r, 200)); 
+      }
+  };
+
+  const handleInitialize = async () => {
+      setIsInitialLoading(true);
+      
+      if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+
+      // Load first 1 step critically
+      const initialStep = LESSON_STEPS[0];
+      await fetchAudioForStep(initialStep, 0);
+      setLoadingProgress(100);
+
+      setIsInitialLoading(false);
+      setHasStarted(true);
+
+      // Background load the rest
+      const remainingSteps = LESSON_STEPS.slice(1);
+      processBackgroundAudio(remainingSteps);
+  };
+
+  // Check audio availability on step change
+  useEffect(() => {
+      if (!hasStarted) return;
+      
+      const checkAudio = async () => {
+          const step = LESSON_STEPS[stepIndex];
+          setStepAudioProgress(0); // Reset progress bar
+
+          if (step.narration) {
+              // Check if already cached
+              if (audioCacheRef.current.has(step.narration)) {
+                  setStepAudioProgress(100);
+              } else {
+                  // Fetch explicitly for this step if missing
+                  await fetchAudioForStep(step, stepIndex, (p) => setStepAudioProgress(p));
+              }
+          } else {
+              setStepAudioProgress(100);
+          }
+      };
+      
+      checkAudio();
+  }, [stepIndex, hasStarted]);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -114,54 +351,20 @@ export default function App() {
       setSelectedParticle(p);
   };
 
-  const addParticle = () => {
-    isUpdatingRef.current = true;
-    const currentList = latestParticlesRef.current;
-    const newParticle: Particle = {
-        id: currentList.length > 0 ? Math.max(...currentList.map(p => p.id)) + 1 : 0,
-        pos: { x: CANVAS_WIDTH/2 + (Math.random()-0.5)*100, y: CANVAS_HEIGHT/2 + (Math.random()-0.5)*100 },
-        vel: { x: 0, y: 0 },
-        val: 0,
-        valVel: 0,
-        phase: Math.random() * Math.PI * 2,
-        phaseVel: 0.1,
-        spin: Math.random() > 0.5 ? 0.5 : -0.5,
-        color: COLORS.blue,
-        isFixed: false
-    };
-    const newList = [...currentList, newParticle];
-    setParticles(newList);
-    latestParticlesRef.current = newList; 
-  };
-
-  const removeParticle = () => {
-      const currentList = latestParticlesRef.current;
-      if (currentList.length > 0) {
-          isUpdatingRef.current = true;
-          const newList = currentList.slice(0, -1);
-          setParticles(newList);
-          latestParticlesRef.current = newList;
-          setSelectedParticle(null);
-      }
-  };
-
   const handleResetCamera = () => {
       setZoom(1);
       setPan({ x: 0, y: 0 });
   };
 
   // --- Quiz Logic ---
-  const attemptNextStep = () => {
+  const attemptNextStep = (forceBypass = false) => {
       const nextIndex = stepIndex + 1;
-      
-      // Check if finished
       if (nextIndex >= LESSON_STEPS.length) {
           setShowResults(true);
           return;
       }
       
-      // Check if current step has questions
-      if (currentStep.questions && currentStep.questions.length > 0) {
+      if (!forceBypass && quizzesEnabled && currentStep.questions && currentStep.questions.length > 0) {
           const qIndex = Math.floor(Math.random() * currentStep.questions.length);
           const question = currentStep.questions[qIndex];
           setQuizState({
@@ -174,23 +377,31 @@ export default function App() {
       }
   };
 
+  const handlePrevStep = () => {
+      setStepIndex(Math.max(0, stepIndex - 1));
+  };
+
   const handleQuizResult = (correct: boolean) => {
       setScore(prev => ({
           correct: prev.correct + (correct ? 1 : 0),
           total: prev.total + 1
       }));
       setQuizState(prev => ({ ...prev, active: false }));
-      
-      // If correct or skipped, we advance.
       setStepIndex(quizState.targetStep);
+  };
+
+  const handleDisableQuizzes = () => {
+      setQuizzesEnabled(false);
+      setQuizState(prev => ({ ...prev, active: false }));
+      setStepIndex(quizState.targetStep); 
   };
 
   const handleRestart = () => {
       setStepIndex(0);
       setScore({ correct: 0, total: 0 });
       setShowResults(false);
-      setHasStarted(false); // Go back to splash? or just step 0? Let's go to Step 0.
-      setHasStarted(true);
+      setQuizzesEnabled(true);
+      setIsAutoPlay(false);
   };
 
   const handleJumpToStep = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -199,25 +410,38 @@ export default function App() {
       setShowResults(false);
   };
 
+  // --- Loading Screen (Initial Only) ---
+  if (isInitialLoading) {
+      return (
+          <div className="w-full h-screen bg-black flex flex-col items-center justify-center font-serif text-cyan-400 relative overflow-hidden">
+               <MatrixBackground />
+               <div className="z-10 bg-black/80 p-10 rounded-xl border border-cyan-900/50 backdrop-blur-sm flex flex-col items-center">
+                    <Loader2 size={64} className="animate-spin mb-6" />
+                    <h2 className="text-3xl font-bold mb-4 cyber-font tracking-widest">
+                       INITIALIZING NEURAL LINK
+                    </h2>
+                    <p className="mb-6 text-slate-400 font-mono">
+                        Synthesizing initial data streams...
+                    </p>
+                    <div className="w-96 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
+                        <div 
+                            className="h-full bg-cyan-500 shadow-[0_0_10px_#06b6d4] transition-all duration-300" 
+                            style={{width: `${loadingProgress}%`}}
+                        />
+                    </div>
+                    <div className="mt-2 font-mono text-sm">{Math.round(loadingProgress)}%</div>
+               </div>
+          </div>
+      );
+  }
+
   // --- Splash Screen ---
   if (!hasStarted) {
     return (
       <div className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center font-serif">
-         <div className="absolute inset-0 opacity-30 pointer-events-none">
-             <SimulationCanvas
-                particles={createParticles('swarm')} 
-                config={{k: 0.05, r0:100, eta:0.1, eta_r:0.1, sigma:100, couplingEnabled: true, phaseEnabled: true, spinEnabled: true, damping: 0.99, temperature: 0.6}}
-                onUpdate={() => {}}
-                onSelectParticle={() => {}}
-                isRunning={true}
-                interactionMode="perturb"
-                zoom={0.8}
-                pan={{x:0, y:0}}
-                onPan={() => {}}
-             />
-         </div>
-
-         <div className="z-10 text-center max-w-4xl px-6 animate-fade-in-up">
+         <MatrixBackground />
+         
+         <div className="z-10 text-center max-w-4xl px-6 animate-fade-in-up bg-black/60 p-12 rounded-2xl border border-cyan-900/30 backdrop-blur-sm">
             <div className="flex justify-center mb-8">
                 <Sparkles className="text-cyan-400 w-24 h-24 animate-pulse neon-text" />
             </div>
@@ -229,7 +453,7 @@ export default function App() {
             </p>
             
             <button
-               onClick={() => setHasStarted(true)}
+               onClick={handleInitialize}
                className="group relative px-12 py-6 bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-100 font-bold text-xl rounded-none border-2 border-cyan-500 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] hover:-translate-y-1 flex items-center gap-4 mx-auto cyber-font uppercase tracking-widest"
             >
                <span>Initialize System</span>
@@ -246,21 +470,40 @@ export default function App() {
 
   // --- Main Application ---
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden text-slate-200 bg-black">
+    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden text-slate-200 bg-black relative pb-24">
       
-      {/* Sidebar / Lesson Control */}
+      {/* --- ADMIN TRIGGER --- */}
+      <button 
+        onClick={() => setShowAdmin(true)}
+        className="fixed top-3 left-3 z-[100] p-2 text-slate-600 hover:text-cyan-400 bg-black/20 hover:bg-black/90 backdrop-blur rounded-full transition-all border border-transparent hover:border-cyan-500/50"
+        title="Admin Console"
+      >
+        <Settings size={16} />
+      </button>
+
+      {/* --- ADMIN PANEL --- */}
+      <AdminPanel 
+         isOpen={showAdmin} 
+         onClose={() => setShowAdmin(false)}
+         lessonSteps={LESSON_STEPS}
+         fetchAudioForStep={(step) => fetchAudioForStep(step, LESSON_STEPS.indexOf(step))}
+      />
+
+      {/* --- LEFT: SIDEBAR / LESSON CONTROL --- */}
       {!isFullScreen && (
       <div className="w-full md:w-2/5 flex flex-col border-r border-slate-800 bg-[#080808] z-10 shadow-2xl relative">
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] pointer-events-none"></div>
 
-        <div className="p-8 border-b border-slate-800 bg-black/50 backdrop-blur-sm">
-          <div className="flex items-center gap-3 mb-4">
-             <button onClick={() => setHasStarted(false)} className="hover:text-cyan-400 transition-colors" title="Back to Title">
-                <Sparkles size={28} className="text-cyan-500 neon-text" />
-             </button>
-             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 cyber-font tracking-tight">
-                QUANTUM PCN
-             </h1>
+        <div className="p-8 border-b border-slate-800 bg-black/50 backdrop-blur-sm pl-12">
+          <div className="flex items-center justify-between mb-4">
+             <div className="flex items-center gap-3">
+                 <button onClick={() => setHasStarted(false)} className="hover:text-cyan-400 transition-colors" title="Back to Title">
+                    <Sparkles size={28} className="text-cyan-500 neon-text" />
+                 </button>
+                 <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 cyber-font tracking-tight">
+                    QUANTUM PCN
+                 </h1>
+             </div>
           </div>
           
           {/* Quick Jump Dropdown */}
@@ -271,7 +514,8 @@ export default function App() {
             <select 
                 value={stepIndex} 
                 onChange={handleJumpToStep}
-                className="w-full bg-slate-900/80 border border-slate-700 text-cyan-400 text-sm rounded pl-10 pr-4 py-2 appearance-none cursor-pointer hover:border-cyan-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono uppercase tracking-wide"
+                disabled={quizState.active}
+                className="w-full bg-slate-900/80 border border-slate-700 text-cyan-400 text-lg rounded pl-10 pr-4 py-2 appearance-none cursor-pointer hover:border-cyan-500 focus:outline-none focus:border-cyan-400 transition-colors font-mono uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {LESSON_STEPS.map((step, idx) => (
                     <option key={idx} value={idx}>
@@ -287,7 +531,7 @@ export default function App() {
 
         <div 
             ref={sidebarRef}
-            className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber pb-24"
+            className="flex-1 overflow-y-auto p-10 space-y-8 relative scrollbar-cyber"
         >
            {showResults ? (
                <div className="animate-fade-in space-y-8">
@@ -338,72 +582,68 @@ export default function App() {
 
                 {currentStep.explanation && (
                     <button 
-                        onClick={() => setShowLearnMore(true)}
-                        className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg flex items-center justify-center gap-2 transition-all group"
+                        onClick={() => {
+                            setShowLearnMore(true);
+                        }}
+                        disabled={quizState.active}
+                        className="w-full py-4 mt-2 bg-slate-900/50 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg flex items-center justify-center gap-2 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <BookOpen size={20} className="group-hover:scale-110 transition-transform"/>
                         <span className="uppercase tracking-widest font-bold text-sm">Open Deep Dive Module</span>
                     </button>
                 )}
 
-                <SymbolTable symbols={currentStep.symbols} />
+                {/* Previous / Next Buttons in Sidebar */}
+                <div className="flex items-center gap-4 mt-4">
+                    <button 
+                        onClick={handlePrevStep}
+                        disabled={stepIndex === 0 || quizState.active}
+                        className="flex-1 px-4 py-3 rounded border border-slate-700 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center justify-center gap-2 text-sm uppercase tracking-wider cyber-font"
+                    >
+                        <ChevronLeft size={16} /> Prev
+                    </button>
 
-                <div className="pt-8 mt-8 border-t border-slate-800">
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setStepIndex(Math.max(0, stepIndex - 1))}
-                            disabled={stepIndex === 0}
-                            className="px-6 py-4 rounded border border-slate-700 text-slate-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all font-semibold flex items-center gap-3 text-sm uppercase tracking-wider cyber-font"
-                        >
-                            <ChevronLeft size={18} /> Prev
-                        </button>
-
-                        <button 
-                            onClick={attemptNextStep}
-                            className="flex-1 px-6 py-4 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-wider cyber-font"
-                        >
-                            {stepIndex === LESSON_STEPS.length - 1 ? 'Finish Lesson' : 'Next Step'} <ChevronRight size={20} />
-                        </button>
-                    </div>
-                    <div className="text-center mt-4 text-xs font-bold text-slate-600 uppercase tracking-[0.2em] font-mono">
-                        Segment {stepIndex + 1} / {LESSON_STEPS.length}
-                    </div>
+                    <button 
+                        onClick={() => attemptNextStep()}
+                        disabled={quizState.active}
+                        className="flex-1 px-4 py-3 rounded bg-cyan-900/30 hover:bg-cyan-800/50 text-cyan-400 border border-cyan-600 font-bold shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider cyber-font disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
+                    >
+                        Next <ChevronRight size={16} />
+                    </button>
                 </div>
 
-                {/* Real-time Energy Chart */}
-                {stepIndex > 1 && (
-                    <div className="mt-10 p-5 bg-black/40 rounded border border-slate-800 shadow-inner">
-                    <div className="flex items-center gap-2 mb-3 text-xs text-yellow-500 font-bold uppercase tracking-wider cyber-font">
-                        <Activity size={14} /> System Free Energy
-                    </div>
-                    <div className="h-40 w-full rounded p-1 border border-slate-800/50 bg-black/20">
-                        <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={energyData}>
-                            <YAxis hide domain={['auto', 'auto']} />
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff' }}
-                                itemStyle={{ color: '#facc15', fontSize: '12px', fontFamily: 'monospace' }}
-                                labelStyle={{ display: 'none' }}
-                            />
-                            <Line type="monotone" dataKey="E" stroke="#facc15" strokeWidth={2} dot={false} isAnimationActive={false} />
-                        </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                    </div>
-                )}
+                <SymbolTable symbols={currentStep.symbols} />
+
+                <div className="text-center mt-12 text-xs font-bold text-slate-600 uppercase tracking-[0.2em] font-mono">
+                    Segment {stepIndex + 1} / {LESSON_STEPS.length}
+                </div>
              </>
            )}
-        </div>
-
-        <div className="p-4 border-t border-slate-800 bg-[#050505] flex justify-between items-center text-[10px] text-slate-600 uppercase tracking-widest font-mono">
-           <span>Rawson (2025)</span>
-           <span>SYS.V.2.0.4</span>
+           
+            {/* Always Visible Control Panel */}
+            <AudioNarrator 
+                text={currentStep.narration || ""} 
+                title={currentStep.title}
+                onPrev={handlePrevStep}
+                onNext={() => attemptNextStep(false)}
+                canPrev={stepIndex > 0 && !quizState.active}
+                canNext={!quizState.active}
+                isAutoPlay={isAutoPlay}
+                onToggleAutoPlay={() => setIsAutoPlay(!isAutoPlay)}
+                onAutoNext={() => attemptNextStep(true)}
+                audioCache={audioCacheRef.current} // Pass the cache
+                audioContext={audioContextRef.current} // Pass the context
+                cacheVersion={cacheVersion} // Pass version to trigger updates
+                loadingProgress={stepAudioProgress} // Pass granular progress
+            />
         </div>
       </div>
       )}
 
-      {/* Main Simulation Area */}
-      <div className="flex-1 relative bg-black overflow-hidden">
+      {/* --- RIGHT: SIMULATION CANVAS --- */}
+      <div className="flex-1 relative bg-black h-[50vh] md:h-auto overflow-hidden">
+        <MatrixBackground />
+        
         <SimulationCanvas 
             particles={particles}
             config={currentStep.config}
@@ -415,176 +655,48 @@ export default function App() {
             pan={pan}
             onPan={setPan}
         />
-        
-        {/* Prediction Error HUD (Step 14 specific) */}
-        {currentStep.config.showGhosts && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
-                <div className="bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-yellow-500/50 shadow-[0_0_20px_rgba(250,204,21,0.2)] flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-yellow-500">
-                        <ScanEye size={20} className="animate-pulse" />
-                        <span className="text-xs font-bold uppercase tracking-widest cyber-font">Visual Link</span>
-                    </div>
-                    <div className="h-4 w-[1px] bg-slate-700"></div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wide">Prediction Deviation</span>
-                        <span className="text-sm font-mono font-bold text-white">
-                            {predictionError !== null ? predictionError.toFixed(2) + ' units' : 'CALCULATING...'}
-                        </span>
-                    </div>
-                    <div className="h-4 w-[1px] bg-slate-700"></div>
-                    <div className="group relative flex items-center gap-2 cursor-help">
-                        <span className="text-[10px] text-slate-500 font-mono uppercase">Ghost Physics</span>
-                        <HelpCircle size={14} className="text-yellow-500" />
-                        
-                        {/* Tooltip */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-72 bg-slate-900/95 border border-yellow-500/30 p-4 rounded-lg text-xs text-slate-300 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none backdrop-blur-xl">
-                            <h5 className="font-bold text-yellow-400 mb-2 uppercase cyber-font">Inertial vs. Structural</h5>
-                            <p className="mb-2 leading-relaxed">
-                                Ghost particles visualize the <strong>inertial trajectory</strong>: where the particle <em>would</em> go if no other forces acted on it.
-                            </p>
-                            <div className="bg-black/50 p-2 rounded mb-2 font-mono text-cyan-300 border border-slate-700 text-[10px]">
-                                r(t+1) = r(t) + v(t)Δt ... (Integrated)
-                            </div>
-                            <p className="text-slate-400 italic">
-                                The distance between the Ghost (Inertia) and the Real Particle (influenced by neighbors) represents <strong>Prediction Error</strong> (Surprise).
-                            </p>
-                        </div>
-                    </div>
+
+        {/* Real-time Energy Chart Overlay */}
+        {stepIndex > 1 && (
+            <div className="absolute bottom-6 left-6 z-20 w-64 p-3 bg-black/60 rounded-lg border border-slate-800 shadow-xl backdrop-blur-md">
+                <div className="flex items-center gap-2 mb-2 text-[10px] text-yellow-500 font-bold uppercase tracking-wider cyber-font">
+                    <Activity size={12} /> System Free Energy
+                </div>
+                <div className="h-20 w-full rounded border border-slate-800/50 bg-black/40">
+                    <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={energyData}>
+                        <YAxis hide domain={['auto', 'auto']} />
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: '#000', border: '1px solid #333', color: '#fff', fontSize: '10px' }}
+                            itemStyle={{ color: '#facc15', fontSize: '10px', fontFamily: 'monospace' }}
+                            labelStyle={{ display: 'none' }}
+                        />
+                        <Line type="monotone" dataKey="E" stroke="#facc15" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                    </LineChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
         )}
-        
-        {/* Persistent Explanation Box when Ghosts are enabled */}
-        {currentStep.config.showGhosts && (
-             <div className="absolute bottom-6 right-6 w-80 bg-slate-900/80 backdrop-blur-md rounded border border-yellow-500/30 shadow-2xl z-20 p-5 pointer-events-none">
-                 <div className="flex items-center gap-2 mb-2 text-yellow-500">
-                    <History size={18} />
-                    <span className="text-sm font-bold uppercase tracking-widest cyber-font">Trajectory Analysis</span>
-                 </div>
-                 <p className="text-xs text-slate-300 leading-relaxed">
-                    <strong>Faded Lines:</strong> Past movement history.
-                    <br/>
-                    <strong>Dotted Circles:</strong> Future state prediction (Inertia).
-                    <br/>
-                    The system tries to minimize the gap between the predicted future (ghosts) and the actual position required by the network structure.
-                 </p>
+
+        {/* --- SYSTEM KEY (Moved to Canvas Layer) --- */}
+        <div className="absolute bottom-6 right-6 p-4 bg-black/80 backdrop-blur border border-slate-800 rounded-lg text-xs z-10 pointer-events-none text-slate-300 shadow-xl">
+             <div className="font-bold mb-2 text-slate-500 uppercase text-[10px] tracking-widest cyber-font">System Key</div>
+             <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
+                    <span className="font-mono text-[10px] text-red-200">SENSORY</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_#06b6d4]"></div>
+                    <span className="font-mono text-[10px] text-cyan-200">PROCESSING</span>
+                </div>
              </div>
-        )}
-
-        {/* Overlay Controls */}
-        <div className="absolute top-6 right-6 flex flex-col gap-3 z-20 items-end">
-            <div className="flex gap-2">
-                <button
-                    onClick={() => setIsFullScreen(!isFullScreen)}
-                    className="flex items-center justify-center w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 rounded-lg border border-cyan-900/50 transition-all shadow-lg backdrop-blur"
-                    title={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                >
-                    {isFullScreen ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
-                </button>
-                <button 
-                    onClick={() => setShowHelp(true)}
-                    className="flex items-center justify-center w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-cyan-400 rounded-lg border border-cyan-900/50 transition-all shadow-lg backdrop-blur"
-                    title="Help"
-                >
-                    <Info size={24} />
-                </button>
-                <button 
-                    onClick={() => {
-                        const setup = createParticles(currentStep.setup);
-                        setParticles(setup);
-                        latestParticlesRef.current = setup;
-                    }}
-                    className="flex items-center gap-2 px-6 py-2 bg-slate-900/90 hover:bg-slate-800 text-white rounded-lg border border-slate-700 transition-all text-sm font-bold uppercase tracking-wide shadow-lg backdrop-blur"
-                >
-                    <RefreshCw size={18} /> Reset
-                </button>
-                <button 
-                    onClick={() => setIsRunning(!isRunning)}
-                    className={`flex items-center gap-2 px-6 py-2 text-white rounded-lg border border-slate-700 transition-all text-sm font-bold uppercase tracking-wide shadow-lg backdrop-blur ${isRunning ? 'bg-red-900/80 hover:bg-red-800 text-red-200' : 'bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200'}`}
-                >
-                    {isRunning ? <><Pause size={18} /> HALT</> : <><Play size={18} /> RUN</>}
-                </button>
-            </div>
-            
-            {/* Particle Controls */}
-            <div className="flex gap-2 bg-slate-900/90 rounded-lg p-2 border border-cyan-900/30 shadow-xl backdrop-blur">
-                 <button 
-                    onClick={removeParticle} 
-                    className="p-3 bg-red-900/20 text-red-400 hover:text-white hover:bg-red-600 rounded-md border border-red-900/50 transition-all" 
-                    title="Remove Particle"
-                >
-                    <Minus size={20} />
-                </button>
-                <span className="text-cyan-400 text-lg self-center px-3 font-mono font-bold w-12 text-center">{particles.length}</span>
-                <button 
-                    onClick={addParticle} 
-                    className="p-3 bg-emerald-900/20 text-emerald-400 hover:text-white hover:bg-emerald-600 rounded-md border border-emerald-900/50 transition-all" 
-                    title="Add Particle"
-                >
-                    <Plus size={20} />
-                </button>
-            </div>
-
-            {/* Camera Controls */}
-            <div className="flex gap-1 bg-slate-900/90 rounded-lg p-1 border border-slate-800 shadow-xl backdrop-blur">
-                <button onClick={() => setZoom(z => Math.max(z * 0.9, 0.2))} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Zoom Out (-)">
-                    <ZoomOut size={18} />
-                </button>
-                 <button onClick={handleResetCamera} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Reset Camera">
-                    <Maximize size={18} />
-                </button>
-                <button onClick={() => setZoom(z => Math.min(z * 1.1, 5))} className="p-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded" title="Zoom In (+)">
-                    <ZoomIn size={18} />
-                </button>
-            </div>
         </div>
 
-        {/* QUIZ MODAL */}
-        {quizState.active && quizState.question && (
-            <QuizModal 
-                questionData={quizState.question}
-                onComplete={() => handleQuizResult(true)}
-                onSkip={() => handleQuizResult(false)}
-            />
-        )}
-
-        {/* LEARN MORE MODAL */}
-        {showLearnMore && (
-            <div className="absolute inset-0 bg-black/95 z-[60] flex items-center justify-center p-4 backdrop-blur-lg animate-fade-in">
-                <div className="bg-[#050505] rounded-xl border border-cyan-500/50 max-w-4xl w-full h-[80vh] shadow-[0_0_100px_rgba(6,182,212,0.15)] relative flex flex-col overflow-hidden">
-                    {/* Header */}
-                    <div className="p-8 border-b border-slate-800 flex justify-between items-start bg-slate-900/20 shrink-0">
-                        <div>
-                             <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 mb-2 cyber-font flex items-center gap-3">
-                                <GraduationCap size={32} />
-                                DEEP DIVE: MODULE {stepIndex + 1}
-                            </h3>
-                             <p className="text-slate-400 text-lg uppercase tracking-wide font-mono">{currentStep.title}</p>
-                        </div>
-                        <button onClick={() => setShowLearnMore(false)} className="text-slate-500 hover:text-white hover:bg-slate-800 p-2 rounded transition-colors">
-                            <X size={32} />
-                        </button>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6 text-slate-300 leading-8 text-lg scrollbar-cyber max-h-full pr-4">
-                        {currentStep.explanation}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="p-6 border-t border-slate-800 bg-slate-900/30 flex justify-end shrink-0">
-                        <button onClick={() => setShowLearnMore(false)} className="px-8 py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold uppercase tracking-widest transition-colors cyber-font">
-                            Return to Simulation
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* Particle Inspector */}
+        {/* --- PARTICLE INSPECTOR (Canvas Overlay) --- */}
         {selectedParticle && (
             <div className="absolute top-6 left-6 w-72 bg-slate-900/90 backdrop-blur-md rounded border border-cyan-500/30 shadow-2xl z-30 animate-fade-in-up p-5">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
+                 <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-2">
                     <h4 className="text-cyan-400 font-bold flex items-center gap-2 cyber-font">
                         <Microscope size={20} /> NODE_{selectedParticle.id}
                     </h4>
@@ -596,61 +708,16 @@ export default function App() {
                         <span className="font-mono text-cyan-300 font-bold text-lg">{selectedParticle.val.toFixed(3)}</span>
                     </div>
                     <div className="flex justify-between items-center bg-black/30 p-2 rounded">
-                        <span className="text-slate-400 uppercase text-xs tracking-wider">Phase (φ)</span>
-                        <span className="font-mono text-purple-400 font-bold text-lg">{(selectedParticle.phase / Math.PI).toFixed(2)}π</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-black/30 p-2 rounded">
                         <span className="text-slate-400 uppercase text-xs tracking-wider">Spin (s)</span>
-                        <div className="flex flex-col items-end">
-                            <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
-                                {selectedParticle.spin > 0 ? '↑ UP' : '↓ DOWN'}
-                            </span>
-                             <span className="text-[10px] text-slate-500 font-mono">Value: {selectedParticle.spin > 0 ? '+0.5' : '-0.5'}</span>
-                        </div>
+                        <span className={`font-mono font-bold text-lg ${selectedParticle.spin > 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                            {selectedParticle.spin > 0 ? 'UP (+1/2)' : 'DOWN (-1/2)'}
+                        </span>
                     </div>
                 </div>
-                {selectedParticle.isFixed && (
-                    <div className="mt-4 text-xs bg-red-900/30 text-red-200 p-3 rounded border border-red-500/30 flex gap-2 items-center uppercase tracking-wider font-bold">
-                        <Info size={14} /> Sensory Node (Fixed)
-                    </div>
-                )}
             </div>
         )}
-
-        {/* Legend */}
-        <div className="absolute bottom-6 left-6 p-5 bg-slate-900/90 backdrop-blur rounded border border-slate-700 text-sm z-20 pointer-events-none text-slate-300 shadow-xl">
-            <div className="font-bold mb-3 text-slate-500 uppercase text-[10px] tracking-[0.2em] cyber-font">System Key</div>
-            <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
-                    <span className="font-mono text-xs">SENSORY_NODE</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_8px_#06b6d4]"></div>
-                    <span className="font-mono text-xs">PROCESSING_NODE</span>
-                </div>
-                {currentStep.config.spinEnabled && (
-                    <>
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full border-2 border-emerald-500"></div>
-                            <span className="font-mono text-xs text-emerald-400">SPIN_UP (+0.5)</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full border-2 border-orange-500 bg-transparent border-dashed"></div>
-                            <span className="font-mono text-xs text-orange-400">SPIN_DOWN (-0.5)</span>
-                        </div>
-                    </>
-                )}
-                {currentStep.config.couplingEnabled && (
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-1 border-b-2 border-dashed border-purple-500"></div>
-                        <span className="font-mono text-xs text-purple-400">VIB_COUPLING</span>
-                    </div>
-                )}
-            </div>
-        </div>
-
       </div>
+
     </div>
   );
 }
