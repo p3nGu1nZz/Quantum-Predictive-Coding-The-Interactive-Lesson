@@ -234,7 +234,7 @@ export default function App() {
 
       // 3. Last Resort: Try local file
       try {
-          const paddedIndex = (stepIdx + 1).toString().padStart(2, '0');
+          const paddedIndex = (stepIdx).toString().padStart(2, '0'); // stepIdx 0 is Intro
           const filePath = `audio/step_${paddedIndex}.mp3`; 
           const response = await fetch(filePath);
           if (response.ok) {
@@ -320,13 +320,13 @@ export default function App() {
           
           // --- BEGIN INTRO TRANSITION ---
           setIsTransitioning(true);
-          setTransitionTarget({ number: 1, title: LESSON_STEPS[0].title });
+          setTransitionTarget({ number: 0, title: LESSON_STEPS[0].title });
           setHasStarted(true); // Mount the main app behind the transition screen
 
-          // Wait 3 seconds before revealing Lesson 1
+          // Wait 5 seconds (5000ms) for the new intro transition
           setTimeout(() => {
               setIsTransitioning(false);
-          }, 3000);
+          }, 5000);
       }
   };
 
@@ -354,17 +354,17 @@ export default function App() {
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
-          // Transition Logic - 3 Seconds Duration
+          // Transition Logic - 5 Seconds Duration (Updated from 3s)
           setIsTransitioning(true);
           const nextStep = LESSON_STEPS[nextIndex];
-          setTransitionTarget({ number: nextIndex + 1, title: nextStep.title });
+          setTransitionTarget({ number: nextIndex, title: nextStep.title });
           
           setTimeout(() => {
               setStepIndex(nextIndex);
               setTimeout(() => {
                   setIsTransitioning(false);
-              }, 100);
-          }, 3000); // 3000ms pause between lessons
+              }, 100); // Short delay to let React render the new step underneath before lifting curtain
+          }, 5000); // 5000ms full transition duration
 
       } else {
           setIsFinished(true);
@@ -509,7 +509,7 @@ export default function App() {
             </div>
 
             <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
-                <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex + 1}</div>
+                <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex}</div>
                 <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
             </div>
 

@@ -1,4 +1,5 @@
 import { LessonStep } from '../types';
+import { Step00_Intro } from './steps/step_00_intro';
 import { Step01 } from './steps/step_01';
 import { Step02 } from './steps/step_02';
 import { Step03 } from './steps/step_03';
@@ -33,6 +34,7 @@ import { Step31 } from './steps/step_31';
 import { Step32 } from './steps/step_32';
 
 export const LESSON_STEPS: LessonStep[] = [
+  Step00_Intro,
   Step01, Step02, Step03, Step04, Step05, Step06, Step07, Step08,
   Step09, Step10, Step11, Step12, Step13, Step14, Step15, Step16,
   Step17, Step18, Step19, Step20, Step21, Step22, Step23, Step24,

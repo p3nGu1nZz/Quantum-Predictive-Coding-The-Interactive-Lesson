@@ -10,28 +10,29 @@ export const Step13: LessonStep = {
     title: "13. Reciprocity",
     content: null,
     subsections: [
-        { at: 0, title: "Newton's Third Law", content: <p>For every action, there is an equal and opposite reaction. We apply this physics to thoughts.</p> },
-        { at: 20, title: "Symmetry", content: <div className="space-y-4">
-             <p>Our force equations satisfy Newton's Third Law perfectly, creating a symmetry called <strong>Reciprocity</strong>.</p>
+        { at: 0, title: "Newton's Third Law", content: <p>Newton's law of action and reaction applies to information dynamics.</p> },
+        
+        { at: 20, title: "Passive AI vs Active Mind", content: <div className="space-y-4">
+             <p>Classical AI is a one-way street: Input → Output.</p>
+             <p>The L-Group framework is a handshake. It enforces <strong>Reciprocity</strong>.</p>
         </div>},
-        { at: 40, title: "Bidirectional Flow", content: <div className="space-y-4">
-             <p>In standard AI, data often flows one way (Input → Output). But in the brain, it is a two-way street.</p>
+        
+        { at: 45, title: "Bidirectional Force", content: <div className="space-y-4">
+             <p><strong>Sensory Push (Bottom-Up):</strong> Data demands recognition.</p>
+             <p><strong>Prediction Pull (Top-Down):</strong> Expectation shapes reality.</p>
         </div>},
-        { at: 60, title: "The Handshake", content: <div className="space-y-4">
-             <p><strong>Bottom-Up:</strong> Sensory data pushes the internal model to adapt to reality.</p>
-             <p><strong>Top-Down:</strong> The internal model pushes back, pulling sensory interpretation towards expectation.</p>
-        </div>},
-        { at: 80, title: "Consciousness", content: <div className="space-y-4">
-             <p>We do not just passively see the world; we project our expectations onto it. This physical tug-of-war is the loop of consciousness.</p>
+        
+        { at: 70, title: "The Negotiation", content: <div className="space-y-4">
+             <p>We do not just record the world; we negotiate with it.</p>
+             <p>This physical tug-of-war is the fundamental loop of consciousness.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'superposition', symbols: [],
     script: [ 
-        { at: 20, type: 'force', targetId: 0, vector: {x:5, y:0}, label: "Action" }, 
-        { at: 25, type: 'force', targetId: 1, vector: {x:-5, y:0}, label: "Reaction" }, 
-        { at: 50, type: 'force', targetId: 'all', vector: {x:0, y:5}, label: "Bottom-Up" },
-        { at: 60, type: 'force', targetId: 'all', vector: {x:0, y:-5}, label: "Top-Down" },
-        { at: 80, type: 'highlight', targetId: 'all', label: "Equilibrium" } 
+        { at: 20, type: 'reset', label: "Passive" }, 
+        { at: 45, type: 'force', targetId: 'all', vector: {x:0, y:5}, label: "Sensory Push" }, 
+        { at: 55, type: 'force', targetId: 'all', vector: {x:0, y:-5}, label: "Prediction Pull" }, 
+        { at: 80, type: 'pulse', targetId: 'all', label: "Negotiation" } 
     ],
-    narration: "For every action, there is an equal and opposite reaction. Sir Isaac Newton figured this out for apples and planets three hundred years ago, and today we apply it to thoughts. In many AI models, data flows one way: from input to output. But in the brain—and in our model—it is a two-way street. While the sensory data (the bottom-up signal) is pushing the internal model to change and adapt to reality, the internal model (the top-down prediction) is pushing back. It is pulling the sensory interpretation towards expectation. We do not just passively see the world; we project our expectations onto it. This physical tug-of-war is the loop of consciousness."
+    narration: "Newton's Third Law: for every action, an equal and opposite reaction. In classical AI, data flows one way—input to output. It is passive. But the L-Group framework enforces Reciprocity. Here, perception is a handshake. As sensory data pushes 'bottom-up', demanding to be recognized, the internal model pushes 'top-down', projecting its expectation. This bidirectional tension creates a dynamic loop. We do not just record the world; we negotiate with it. This physical tug-of-war between what we see and what we expect is the fundamental loop of consciousness."
 };
