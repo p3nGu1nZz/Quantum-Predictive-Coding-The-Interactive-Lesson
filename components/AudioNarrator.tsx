@@ -9,7 +9,8 @@ interface AudioNarratorProps {
   onProgressUpdate?: (progress: number) => void;
   soundEnabled: boolean;
   playbackSpeed?: number;
-  disabled?: boolean; // New prop to force silence during transitions
+  disabled?: boolean;
+  onPlayStateChange?: (isPlaying: boolean) => void; // New Prop for BGM Ducking
 }
 
 export const AudioNarrator: React.FC<AudioNarratorProps> = ({ 
@@ -21,7 +22,8 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     onProgressUpdate,
     soundEnabled,
     playbackSpeed = 1,
-    disabled = false
+    disabled = false,
+    onPlayStateChange
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -32,6 +34,11 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
   
   const playbackSpeedRef = useRef(playbackSpeed);
   useEffect(() => { playbackSpeedRef.current = playbackSpeed; }, [playbackSpeed]);
+
+  // Notify parent of play state for Music Ducking
+  useEffect(() => {
+    if (onPlayStateChange) onPlayStateChange(isPlaying);
+  }, [isPlaying, onPlayStateChange]);
 
   // Clean up on unmount or disable
   useEffect(() => {

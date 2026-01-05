@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
 import { AudioNarrator } from './components/AudioNarrator'; 
+import { BackgroundAudio } from './components/BackgroundAudio';
 import { MatrixBackground } from './components/MatrixBackground'; 
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
@@ -73,6 +74,7 @@ export default function App() {
   const [currentPlaybackProgress, setCurrentPlaybackProgress] = useState(0); 
   const [cacheVersion, setCacheVersion] = useState(0); 
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [narratorActive, setNarratorActive] = useState(false); // For music ducking
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFinished, setIsFinished] = useState(false);
   
@@ -313,9 +315,18 @@ export default function App() {
           }
       } else if (initStatus === 'ready') {
           if (audioContextRef.current?.state === 'suspended') {
-              audioContextRef.current.resume();
+              await audioContextRef.current.resume();
           }
-          setHasStarted(true);
+          
+          // --- BEGIN INTRO TRANSITION ---
+          setIsTransitioning(true);
+          setTransitionTarget({ number: 1, title: LESSON_STEPS[0].title });
+          setHasStarted(true); // Mount the main app behind the transition screen
+
+          // Wait 3 seconds before revealing Lesson 1
+          setTimeout(() => {
+              setIsTransitioning(false);
+          }, 3000);
       }
   };
 
@@ -323,8 +334,6 @@ export default function App() {
       if (!hasStarted) return;
       
       const current = LESSON_STEPS[stepIndex];
-      // Only attempt fetch if sound is enabled. 
-      // This effect will re-run when soundEnabled changes, ensuring we fetch missed audio.
       if (soundEnabled) {
           fetchAudioForStep(current, stepIndex);
           const nextStep = LESSON_STEPS[stepIndex + 1];
@@ -345,7 +354,7 @@ export default function App() {
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
-          // Transition Logic
+          // Transition Logic - 3 Seconds Duration
           setIsTransitioning(true);
           const nextStep = LESSON_STEPS[nextIndex];
           setTransitionTarget({ number: nextIndex + 1, title: nextStep.title });
@@ -355,7 +364,7 @@ export default function App() {
               setTimeout(() => {
                   setIsTransitioning(false);
               }, 100);
-          }, 2500);
+          }, 3000); // 3000ms pause between lessons
 
       } else {
           setIsFinished(true);
@@ -368,6 +377,7 @@ export default function App() {
       }
   };
 
+  // Render TitleScreen only if NOT started
   if (!hasStarted) {
     return (
         <TitleScreen 
@@ -398,7 +408,14 @@ export default function App() {
   return (
     <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
       
-      {/* Transition Overlay */}
+      {/* Background Music System */}
+      <BackgroundAudio 
+         isPlaying={soundEnabled} 
+         isNarrating={narratorActive} 
+         volume={0.25} // Mid-tempo ambient level
+      />
+
+      {/* Transition Overlay (z-500) */}
       <TransitionScreen 
          isVisible={isTransitioning} 
          lessonNumber={transitionTarget?.number || 0} 
@@ -414,7 +431,8 @@ export default function App() {
           onProgressUpdate={setCurrentPlaybackProgress} 
           soundEnabled={soundEnabled}
           playbackSpeed={playbackSpeed}
-          disabled={isTransitioning} // Pause audio engine during visual transition
+          disabled={isTransitioning} 
+          onPlayStateChange={setNarratorActive} // Trigger ducking
       />
 
       {/* Main Content Area */}
