@@ -198,7 +198,7 @@ export default function App() {
       
       if (audioCacheRef.current.has(textToSpeak)) return true;
 
-      // 1. Try IndexedDB 
+      // 1. Try IndexedDB - Checks if cached text matches current text
       let idbMiss = true;
       try {
           const cachedItem = await getAudioFromDB(cacheKey);
@@ -210,13 +210,14 @@ export default function App() {
           }
       } catch(e) { }
 
-      // 2. Fallback to API 
+      // 2. Fallback to API if DB miss or text changed
       if (idbMiss && !isQuotaExceeded.current) {
           const generatedBuffer = await generateSpeech(textToSpeak);
           if (generatedBuffer) {
               try {
                   const buffer = decodePCM(generatedBuffer, audioContextRef.current);
                   audioCacheRef.current.set(textToSpeak, buffer);
+                  // Save with new text, overwriting old if key exists
                   saveAudioToDB(cacheKey, textToSpeak, generatedBuffer);
                   return true;
               } catch (e) { console.error(e); }
@@ -373,7 +374,7 @@ export default function App() {
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
 
   return (
-    <div className="flex w-full h-screen bg-black overflow-hidden relative">
+    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
       <AudioNarrator 
           text={currentStep.narration || ""} 
           onAutoNext={attemptNextStep} 
@@ -385,104 +386,112 @@ export default function App() {
           playbackSpeed={playbackSpeed}
       />
 
-      <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
-         <div className="p-8 pb-4">
-             <div className="flex items-center gap-2 mb-2 opacity-50">
-                 <Activity size={16} className="text-cyan-500 animate-pulse" />
-                 <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode // {soundEnabled ? "Auto-Seq" : "Manual"}</span>
+      {/* Main Content Area */}
+      <div className="flex flex-1 w-full relative overflow-hidden">
+          <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
+             <div className="p-8 pb-4 shrink-0">
+                 <div className="flex items-center gap-2 mb-2 opacity-50">
+                     <Activity size={16} className="text-cyan-500 animate-pulse" />
+                     <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode // {soundEnabled ? "Auto-Seq" : "Manual"}</span>
+                 </div>
+                 <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
+                     {currentStep.title}
+                 </h1>
+                 <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
              </div>
-             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
-                 {currentStep.title}
-             </h1>
-             <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
-         </div>
-         
-         <div 
-            className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-hide"
-         >
-             <div className="h-full flex flex-col transition-all duration-500">
-                {activeSubsection ? (
-                    <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
-                            <span>{activeSubsection.title}</span>
-                            <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
-                        </div>
-                        <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
-                            {activeSubsection.content}
-                        </div>
-                        {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
-                    </div>
-                ) : (
-                    <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
-                        {currentStep.content}
-                        <SymbolTable symbols={currentStep.symbols} />
-                    </div>
-                )}
-             </div>
-         </div>
-
-         <div className="h-2 bg-slate-900 w-full relative">
+             
              <div 
-                 className="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-200 ease-linear"
-                 style={{ width: `${currentPlaybackProgress}%` }}
-             ></div>
-         </div>
+                className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+             >
+                 <style>{`
+                    ::-webkit-scrollbar { display: none; }
+                 `}</style>
+                 <div className="h-full flex flex-col transition-all duration-500">
+                    {activeSubsection ? (
+                        <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
+                                <span>{activeSubsection.title}</span>
+                                <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
+                            </div>
+                            <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
+                                {activeSubsection.content}
+                            </div>
+                            {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+                        </div>
+                    ) : (
+                        <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
+                            {currentStep.content}
+                            <SymbolTable symbols={currentStep.symbols} />
+                        </div>
+                    )}
+                 </div>
+             </div>
+          </div>
+
+          <div className="w-[60%] h-full relative bg-black">
+            <MatrixBackground />
+            
+            <div className="absolute inset-0">
+                <SimulationCanvas 
+                    particles={particles}
+                    config={currentConfig} 
+                    onUpdate={handleUpdate}
+                    onSelectParticle={setSelectedParticle}
+                    isRunning={isRunning}
+                    interactionMode="perturb" 
+                    cameraMode={cameraMode}
+                    manualZoom={manualZoom}
+                    manualPan={manualPan}
+                    onPan={setManualPan} 
+                    playbackProgress={currentPlaybackProgress}
+                    script={currentStep.script}
+                    onScriptTrigger={handleScriptTrigger}
+                />
+            </div>
+
+            <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
+                <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex + 1}</div>
+                <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
+            </div>
+
+            {!soundEnabled && (
+                <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
+                    <button 
+                        onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                        className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                        title="Toggle Speed 1x/4x"
+                    >
+                        <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                    </button>
+                    <button 
+                        onClick={handlePrevStep} 
+                        disabled={stepIndex === 0}
+                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
+                        Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
+                    </div>
+                    <button 
+                        onClick={attemptNextStep} 
+                        disabled={isFinished}
+                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                    >
+                        <ChevronRight size={24} />
+                    </button>
+                </div>
+            )}
+          </div>
       </div>
 
-      <div className="w-[60%] h-full relative bg-black">
-        <MatrixBackground />
-        
-        <div className="absolute inset-0">
-            <SimulationCanvas 
-                particles={particles}
-                config={currentConfig} 
-                onUpdate={handleUpdate}
-                onSelectParticle={setSelectedParticle}
-                isRunning={isRunning}
-                interactionMode="perturb" 
-                cameraMode={cameraMode}
-                manualZoom={manualZoom}
-                manualPan={manualPan}
-                onPan={setManualPan} 
-                playbackProgress={currentPlaybackProgress}
-                script={currentStep.script}
-                onScriptTrigger={handleScriptTrigger}
-            />
-        </div>
-
-        <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
-            <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex + 1}</div>
-            <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
-        </div>
-
-        {!soundEnabled && (
-            <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
-                <button 
-                    onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
-                    className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
-                    title="Toggle Speed 1x/4x"
-                >
-                    <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
-                </button>
-                <button 
-                    onClick={handlePrevStep} 
-                    disabled={stepIndex === 0}
-                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
-                    Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
-                </div>
-                <button 
-                    onClick={attemptNextStep} 
-                    disabled={isFinished}
-                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                >
-                    <ChevronRight size={24} />
-                </button>
-            </div>
-        )}
+      {/* Progress Bar Spanning Full Width at Bottom */}
+      <div className="h-2 bg-slate-900 w-full relative shrink-0 z-50">
+         <div 
+             className="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-200 ease-linear"
+             style={{ width: `${currentPlaybackProgress}%` }}
+         ></div>
       </div>
     </div>
   );

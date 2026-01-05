@@ -51,8 +51,8 @@ export const MatrixBackground: React.FC = () => {
                 vec2 grid = vec2(floor(uv.x * columns), floor(uv.y * rows));
                 vec2 st = fract(vec2(uv.x * columns, uv.y * rows));
 
-                // Speed
-                float speed = 1.0 + random(vec2(grid.x, 0.0)) * 2.0;
+                // Speed - Significantly Reduced (approx 25% of original)
+                float speed = (1.0 + random(vec2(grid.x, 0.0)) * 2.0) * 0.25;
                 float t = uTime * speed;
                 
                 // Falling effect
@@ -76,11 +76,12 @@ export const MatrixBackground: React.FC = () => {
                 float charFlicker = step(0.5, random(vec2(grid.x, floor(t * 10.0))));
                 
                 // Matrix Green Color Palette
-                vec3 color = vec3(0.0, 1.0, 0.2) * intensity;
+                // Brightness Reduced to ~11% (1/3 of previous 0.33)
+                vec3 color = vec3(0.0, 1.0, 0.2) * intensity * 0.11;
                 
-                // Bright head
+                // Bright head (also dimmed significantly)
                 if(dist < 0.05) {
-                    color = vec3(0.8, 1.0, 0.9);
+                    color = vec3(0.6, 0.8, 0.7) * 0.3;
                 }
                 
                 // Glyph shape (abstracted)

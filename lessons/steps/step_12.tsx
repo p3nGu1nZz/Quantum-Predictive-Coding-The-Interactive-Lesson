@@ -10,11 +10,21 @@ export const Step12: LessonStep = {
     title: "12. Gradient Descent",
     content: null,
     subsections: [
-        { at: 0, title: "Gravity for Data", content: <p>In classical machine learning, Gradient Descent is an iterative optimization algorithm. In the L-Group framework, it is a physical law: <strong>Gravity</strong> acting on high-dimensional data.</p> },
-        { at: 40, title: "Kinetic Optimization", content: <div className="space-y-4">
-            <p>We derive the motion of every particle from the potential energy field of the error landscape. The force vector <InlineMath math="\\mathbf{F}_i" /> is the negative gradient of the loss <InlineMath math="\\mathcal{L}" />:</p>
+        { at: 0, title: "Gravity for Data", content: <div className="space-y-4">
+            <p>You are watching a physical manifestation of the most famous algorithm in machine learning: <strong>Gradient Descent</strong>.</p>
+            <p>In a normal computer, this is a dry calculus operation performed in the dark recesses of a GPU. It calculates the slope of a curve and updates a number.</p>
+        </div> },
+        { at: 35, title: "From Math to Motion", content: <div className="space-y-4">
+            <p>But here? Here, it is <strong>Gravity</strong>. The spatial update rule dictates that a particle's velocity is proportional to the slope of the error landscape.</p>
+            <p>If a particle is in a state of high error, it "feels" a steep slope beneath its feet. It accelerates.</p>
+        </div> },
+        { at: 60, title: "Kinetic Optimization", content: <div className="space-y-4">
+            <p>It rushes down the gradient, picking up speed. As the error decreases, the slope flattens out, and the particle naturally slows down.</p>
             <MathBlock>{'\\mathbf{F}_i = -\\nabla_{\\mathbf{r}_i} \\mathcal{L} \\quad \\Rightarrow \\quad \\mathbf{a}_i \\propto \\text{Slope}'}</MathBlock>
-            <p>This transforms an abstract calculus operation into a kinetic simulation. Particles "roll" down the error surface, accelerating where the gradient is steep (high error) and naturally braking as the terrain flattens (convergence). It is a self-regulating optimizer driven by the geometry of the problem itself.</p>
+        </div> },
+        { at: 85, title: "Local Intelligence", content: <div className="space-y-4">
+            <p>This "Gravity for Data" localizes the learning rule. A particle doesn't need a master plan; it just needs to feel the slope.</p>
+            <p>From this local gravity, global intelligence emerges.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'error_landscape', symbols: [],
