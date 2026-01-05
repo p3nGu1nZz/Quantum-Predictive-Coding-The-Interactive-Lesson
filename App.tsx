@@ -399,15 +399,19 @@ export default function App() {
 
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
 
+  // Background Audio Mixing Constants
+  const BGM_BASE_VOL = 0.4;
+  const BGM_DUCKED_VOL = 0.15; // 37.5% of base volume for subtle ducking
+
   return (
     <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
       
       {/* GLOBAL AUDIO SYSTEM - MOUNTED AT ROOT */}
+      {/* Starts playing when user clicks Initialize on Title Screen */}
       <ProceduralBackgroundAudio 
-         isPlaying={soundEnabled && (initStatus !== 'idle')} // Starts playing when user clicks Initialize
-         isNarrating={narratorActive} 
-         volume={0.4} 
-         mode={hasStarted ? 'lesson' : 'title'} // Switches filter mode
+         isPlaying={soundEnabled && (initStatus !== 'idle')} 
+         volume={narratorActive ? BGM_DUCKED_VOL : BGM_BASE_VOL} 
+         mode={hasStarted ? 'lesson' : 'title'} 
       />
 
       <SoundEffects trigger={lastSfxTrigger} soundEnabled={soundEnabled} />

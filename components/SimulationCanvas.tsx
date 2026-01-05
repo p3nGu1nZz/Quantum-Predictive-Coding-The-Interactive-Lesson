@@ -58,7 +58,10 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
   const wavefrontsRef = useRef<{x:number, y:number, r:number, life:number}[]>([]);
   const sparksRef = useRef<Spark[]>([]);
+  
+  // New: Trails Reference
   const trailsRef = useRef<Map<number, Vector2[]>>(new Map());
+  
   const triggeredEventsRef = useRef<Set<number>>(new Set());
   const prevProgressRef = useRef(0);
   const timeRef = useRef(0);
@@ -308,12 +311,12 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         if (scale > 1.01) scale *= 0.95;
         if (scale < 0.99) scale += 0.05;
 
+        // --- TRAIL LOGIC ---
         const trail = trailsRef.current.get(p.id) || [];
-        if (trail.length === 0 || Math.random() > 0.7) {
-            trail.push({x: nextX, y: nextY});
-            if (trail.length > 15) trail.shift();
-            trailsRef.current.set(p.id, trail);
-        }
+        trail.push({x: nextX, y: nextY});
+        if (trail.length > 20) trail.shift();
+        trailsRef.current.set(p.id, trail);
+        // -------------------
 
         return { ...p, pos: { x: nextX, y: nextY }, vel: { x: newVelX, y: newVelY }, phase: newPhase, scale, visible };
     });
@@ -341,14 +344,21 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 if (p.pos.y > maxY) maxY = p.pos.y;
             });
 
-            const padding = 150;
-            const width = Math.max(200, maxX - minX + padding * 2);
-            const height = Math.max(200, maxY - minY + padding * 2);
+            if (minX === Infinity) { minX = 0; maxX = 0; minY = 0; maxY = 0; }
+
+            const spreadX = maxX - minX;
+            const spreadY = maxY - minY;
+            // Robust padding: At least 150px or 20% of the spread
+            const padding = Math.max(150, Math.max(spreadX, spreadY) * 0.2); 
+
+            const width = Math.max(300, spreadX + padding * 2);
+            const height = Math.max(300, spreadY + padding * 2);
 
             const scaleX = CANVAS_WIDTH / width;
             const scaleY = CANVAS_HEIGHT / height;
-            targetZoom = Math.min(1.5, Math.min(scaleX, scaleY)); 
-            targetZoom = Math.max(0.5, targetZoom); 
+            
+            targetZoom = Math.min(scaleX, scaleY);
+            targetZoom = Math.max(0.1, Math.min(2.0, targetZoom)); // Limit zoom range
 
             const centerX = (minX + maxX) / 2;
             const centerY = (minY + maxY) / 2;
@@ -357,9 +367,22 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
     }
 
+    // Smooth Interpolation
     cameraStateRef.current.zoom += (targetZoom - cameraStateRef.current.zoom) * 0.05;
     cameraStateRef.current.pan.x += (targetPanX - cameraStateRef.current.pan.x) * 0.05;
     cameraStateRef.current.pan.y += (targetPanY - cameraStateRef.current.pan.y) * 0.05;
+  };
+
+  const getParticleColor = (p: Particle) => {
+    if (configRef.current.phaseEnabled) {
+         const hue = 180 + ((Math.sin(p.phase) + 1) / 2) * 150;
+         return `hsl(${hue}, 90%, 60%)`;
+    }
+    if (configRef.current.spinEnabled) {
+         if (p.spin > 0.5) return COLORS.green;
+         if (p.spin < 0.5) return COLORS.orange;
+    }
+    return p.color;
   };
 
   const animate = useCallback((now: number) => {
@@ -404,6 +427,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              const ps = particlesRef.current;
              const config = configRef.current;
              
+             // Background Tensor Field Visualization
              const tensorGridSize = 60;
              const boundsPad = 200;
              const startX = Math.floor((vbX - boundsPad) / tensorGridSize) * tensorGridSize;
@@ -441,41 +465,20 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                         ctx.lineTo(x + Math.cos(angle)*len/2, y + Math.sin(angle)*len/2);
                         ctx.strokeStyle = `rgba(34, 211, 238, ${opacity})`;
                         ctx.stroke();
-
-                        if (mag > 2) {
-                             ctx.beginPath();
-                             const tipX = x + Math.cos(angle)*len/2;
-                             const tipY = y + Math.sin(angle)*len/2;
-                             ctx.moveTo(tipX, tipY);
-                             ctx.lineTo(tipX - Math.cos(angle - 0.5)*4, tipY - Math.sin(angle - 0.5)*4);
-                             ctx.moveTo(tipX, tipY);
-                             ctx.lineTo(tipX - Math.cos(angle + 0.5)*4, tipY - Math.sin(angle + 0.5)*4);
-                             ctx.stroke();
-                        }
                     }
                 }
              }
 
-             ctx.strokeStyle = '#0f172a'; 
-             ctx.lineWidth = 1;
-             ctx.beginPath();
-             const gridSize = 100;
-             for(let x=-1000; x<=CANVAS_WIDTH+1000; x+=gridSize) { 
-                 ctx.moveTo(x, -1000); ctx.lineTo(x, CANVAS_HEIGHT+1000); 
-             }
-             for(let y=-1000; y<=CANVAS_HEIGHT+1000; y+=gridSize) { 
-                 ctx.moveTo(-1000, y); ctx.lineTo(CANVAS_WIDTH+1000, y); 
-             }
-             ctx.stroke();
-
+             // Render Interactions
              interactionsRef.current.forEach(int => {
                  const p1 = ps.find(p => p.id === int.p1);
                  const p2 = ps.find(p => p.id === int.p2);
                  if (p1 && p2 && p1.visible !== false && p2.visible !== false) {
+                     const p1Color = getParticleColor(p1);
                      ctx.beginPath();
                      ctx.moveTo(p1.pos.x, p1.pos.y);
                      ctx.lineTo(p2.pos.x, p2.pos.y);
-                     ctx.strokeStyle = configRef.current.spinEnabled && (p1.spin * p2.spin) <= 0 ? COLORS.red : p1.color;
+                     ctx.strokeStyle = configRef.current.spinEnabled && (p1.spin * p2.spin) <= 0 ? COLORS.red : p1Color;
                      ctx.lineWidth = int.coupling > 0.8 ? 2.5 : 1;
                      ctx.globalAlpha = Math.min(1, int.coupling) * 0.4;
                      if (configRef.current.spinEnabled) ctx.setLineDash([5, 5]);
@@ -485,24 +488,33 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  }
              });
 
+             // Render Particles & Trails
              ps.forEach(p => {
                  if (p.visible === false) return;
                  const currentScale = p.scale || 1.0;
-                 
+                 const dynamicColor = getParticleColor(p);
+
+                 // Draw Trails
                  const trail = trailsRef.current.get(p.id);
                  if (trail && trail.length > 1) {
-                     ctx.beginPath();
-                     ctx.moveTo(trail[0].x, trail[0].y);
-                     for(let i=1; i<trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
-                     ctx.strokeStyle = p.color;
-                     ctx.globalAlpha = 0.4;
-                     ctx.stroke();
+                     for (let i = 0; i < trail.length - 1; i++) {
+                         const pt1 = trail[i];
+                         const pt2 = trail[i + 1];
+                         const opacity = (i / trail.length) * 0.5; // Fade tail
+
+                         ctx.beginPath();
+                         ctx.moveTo(pt1.x, pt1.y);
+                         ctx.lineTo(pt2.x, pt2.y);
+                         ctx.strokeStyle = dynamicColor;
+                         ctx.globalAlpha = opacity;
+                         ctx.stroke();
+                     }
                      ctx.globalAlpha = 1.0;
                  }
 
+                 // Draw Force Indicators
                  if (p.force && (Math.abs(p.force.x) > 0.1 || Math.abs(p.force.y) > 0.1)) {
                      const fMag = Math.sqrt(p.force.x*p.force.x + p.force.y*p.force.y);
-                     // Force Clamping using Tanh for soft limit - Fixes yellow lines going off screen
                      const visualLen = 40 * Math.tanh(fMag * 0.1); 
                      
                      const angle = Math.atan2(p.force.y, p.force.x);
@@ -517,37 +529,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                      ctx.globalAlpha = 0.8;
                      ctx.stroke();
                      ctx.globalAlpha = 1.0;
-
-                     const lineLen = visualLen;
-                     const speed = fMag * 0.2; 
-                     const animOffset = (now * speed) % lineLen; 
-                     
-                     const cX = p.pos.x + Math.cos(angle) * animOffset;
-                     const cY = p.pos.y + Math.sin(angle) * animOffset;
-                     
-                     const size = 6;
-                     const backX = cX - Math.cos(angle) * size;
-                     const backY = cY - Math.sin(angle) * size;
-                     const perpX = -Math.sin(angle) * size;
-                     const perpY = Math.cos(angle) * size;
-                     
-                     ctx.beginPath();
-                     ctx.moveTo(cX, cY); 
-                     ctx.lineTo(backX + perpX, backY + perpY); 
-                     ctx.moveTo(cX, cY);
-                     ctx.lineTo(backX - perpX, backY - perpY); 
-                     ctx.strokeStyle = '#ffffff';
-                     ctx.lineWidth = 2;
-                     ctx.shadowColor = COLORS.yellow;
-                     ctx.shadowBlur = 10;
-                     ctx.stroke();
-                     ctx.shadowBlur = 0;
                  }
 
+                 // Draw Particle Body
                  const radius = 8 * currentScale;
                  ctx.shadowBlur = 20 * currentScale;
-                 ctx.shadowColor = p.color;
-                 ctx.fillStyle = p.color;
+                 ctx.shadowColor = dynamicColor;
+                 ctx.fillStyle = dynamicColor;
                  ctx.beginPath();
                  ctx.arc(p.pos.x, p.pos.y, radius, 0, Math.PI * 2);
                  ctx.fill();
@@ -559,6 +547,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  ctx.fill();
              });
 
+             // Wavefronts
              wavefrontsRef.current.forEach(w => {
                  ctx.beginPath();
                  ctx.strokeStyle = `rgba(6, 182, 212, ${w.life})`; 
@@ -566,6 +555,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  ctx.stroke();
              });
 
+             // Script Labels
              scriptRef.current.forEach(evt => {
                 const end = evt.at + (evt.duration || 10);
                 if (progressRef.current >= evt.at && progressRef.current < end && evt.label) {

@@ -2,9 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 
 interface ProceduralBackgroundAudioProps {
   isPlaying: boolean;
-  isNarrating: boolean; // Signal to duck volume
   volume?: number;
-  mode?: 'title' | 'lesson'; // New prop to control audio intensity/filter
+  mode?: 'title' | 'lesson'; // 'title' = muffled, 'lesson' = clear
 }
 
 // IndexedDB configuration for Music Cache
@@ -14,7 +13,6 @@ const TRACK_KEY = 'cyberpunk_midtempo_v2'; // Bump version to force regen
 
 export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps> = ({ 
   isPlaying, 
-  isNarrating, 
   volume = 0.4,
   mode = 'lesson'
 }) => {
@@ -112,26 +110,6 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
     return await offlineCtx.startRendering();
   };
 
-  // --- IndexedDB Management ---
-  const getCachedTrack = async (db: IDBDatabase): Promise<AudioBuffer | null> => {
-      return new Promise((resolve) => {
-          const tx = db.transaction(STORE_NAME, 'readonly');
-          const store = tx.objectStore(STORE_NAME);
-          const req = store.get(TRACK_KEY);
-          req.onsuccess = () => {
-              if (req.result && audioContextRef.current) {
-                  // If we stored raw data, decode is needed, but we stored structure.
-                  // Simpler: Just regen if complex storage is hard. 
-                  // For this demo, let's regen to be safe and consistent without complex serialization.
-                  resolve(null); 
-              } else {
-                  resolve(null);
-              }
-          };
-          req.onerror = () => resolve(null);
-      });
-  };
-
   const startPlayback = (ctx: AudioContext, buffer: AudioBuffer) => {
       // Create Filter for Title/Lesson Mode Transition
       const filter = ctx.createBiquadFilter();
@@ -189,24 +167,19 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
       }
   }, [mode]);
 
-  // Documentary Style Mixing (Ducking)
+  // Handle Volume Updates (e.g. Ducking) with smooth transition
   useEffect(() => {
     if (!gainNodeRef.current || !audioContextRef.current) return;
     const ctx = audioContextRef.current;
     const gainNode = gainNodeRef.current;
-    
-    // Documentary mix: Background music drops significantly when voice is active
-    const target = isNarrating ? volume * 0.2 : volume; 
-    
     const now = ctx.currentTime;
+    
     gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setTargetAtTime(target, now, 0.8); // Slower fade for cinematic feel
-
-  }, [isNarrating, volume]);
+    gainNode.gain.setTargetAtTime(volume, now, 0.5); // Smooth 0.5s fade to new volume
+  }, [volume]);
 
   useEffect(() => {
       return () => {
-          // Cleanup on unmount (though we moved this to App top level so it shouldn't unmount often)
           if (sourceNodeRef.current) sourceNodeRef.current.stop();
           if (audioContextRef.current) audioContextRef.current.close();
       };
