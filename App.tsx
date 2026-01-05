@@ -4,6 +4,7 @@ import { SymbolTable } from './components/SymbolTable';
 import { AudioNarrator } from './components/AudioNarrator'; 
 import { MatrixBackground } from './components/MatrixBackground'; 
 import { TitleScreen } from './components/TitleScreen';
+import { TransitionScreen } from './components/TransitionScreen';
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
@@ -85,6 +86,10 @@ export default function App() {
   const [manualPan, setManualPan] = useState<Vector2>({ x: 0, y: 0 });
   
   const [activeSubsectionIndex, setActiveSubsectionIndex] = useState(0); 
+  
+  // Transition State
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState<{number: number, title: string} | null>(null);
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -203,6 +208,7 @@ export default function App() {
       try {
           const cachedItem = await getAudioFromDB(cacheKey);
           if (cachedItem && cachedItem.text === textToSpeak) {
+              // CACHE HIT: Text hasn't changed, use cached buffer
               const buffer = decodePCM(cachedItem.buffer, audioContextRef.current);
               audioCacheRef.current.set(textToSpeak, buffer); 
               idbMiss = false;
@@ -334,7 +340,20 @@ export default function App() {
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
-          setStepIndex(nextIndex);
+          // Transition Logic
+          setIsTransitioning(true);
+          const nextStep = LESSON_STEPS[nextIndex];
+          setTransitionTarget({ number: nextIndex + 1, title: nextStep.title });
+          
+          // Wait 2.5s (2500ms) for transition animation before actually changing content
+          setTimeout(() => {
+              setStepIndex(nextIndex);
+              // Small buffer to allow render to catch up before fading curtain out
+              setTimeout(() => {
+                  setIsTransitioning(false);
+              }, 100);
+          }, 2500);
+
       } else {
           setIsFinished(true);
       }
@@ -342,6 +361,8 @@ export default function App() {
 
   const handlePrevStep = () => {
       if (stepIndex > 0) {
+          // Simple transition back without the fancy screen to keep flow quick, or use it too?
+          // Using it for consistency but maybe shorter? Let's stick to standard change for back.
           setStepIndex(prev => prev - 1);
       }
   };
@@ -375,6 +396,14 @@ export default function App() {
 
   return (
     <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
+      
+      {/* Transition Overlay */}
+      <TransitionScreen 
+         isVisible={isTransitioning} 
+         lessonNumber={transitionTarget?.number || 0} 
+         title={transitionTarget?.title || ""} 
+      />
+
       <AudioNarrator 
           text={currentStep.narration || ""} 
           onAutoNext={attemptNextStep} 
@@ -384,6 +413,7 @@ export default function App() {
           onProgressUpdate={setCurrentPlaybackProgress} 
           soundEnabled={soundEnabled}
           playbackSpeed={playbackSpeed}
+          disabled={isTransitioning} // Pause audio engine during visual transition
       />
 
       {/* Main Content Area */}
@@ -438,7 +468,7 @@ export default function App() {
                     config={currentConfig} 
                     onUpdate={handleUpdate}
                     onSelectParticle={setSelectedParticle}
-                    isRunning={isRunning}
+                    isRunning={isRunning && !isTransitioning} // Pause sim during transition
                     interactionMode="perturb" 
                     cameraMode={cameraMode}
                     manualZoom={manualZoom}

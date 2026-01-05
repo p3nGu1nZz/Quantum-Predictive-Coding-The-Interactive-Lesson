@@ -9,6 +9,7 @@ interface AudioNarratorProps {
   onProgressUpdate?: (progress: number) => void;
   soundEnabled: boolean;
   playbackSpeed?: number;
+  disabled?: boolean; // New prop to force silence during transitions
 }
 
 export const AudioNarrator: React.FC<AudioNarratorProps> = ({ 
@@ -19,7 +20,8 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     cacheVersion,
     onProgressUpdate,
     soundEnabled,
-    playbackSpeed = 1
+    playbackSpeed = 1,
+    disabled = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -31,13 +33,18 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
   const playbackSpeedRef = useRef(playbackSpeed);
   useEffect(() => { playbackSpeedRef.current = playbackSpeed; }, [playbackSpeed]);
 
-  // Clean up on unmount
+  // Clean up on unmount or disable
   useEffect(() => {
+    if (disabled) {
+        stopAudio();
+    }
     return () => stopAudio();
-  }, []);
+  }, [disabled]);
 
   // Effect to handle Playback triggers
   useEffect(() => {
+    if (disabled) return;
+
     // 1. If text changed completely, we must stop previous audio
     if (text !== currentTextRef.current) {
         stopAudio();
@@ -58,11 +65,11 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
             return () => clearTimeout(timer);
         }
     } 
-  }, [text, audioCache, audioContext, cacheVersion, soundEnabled]); 
+  }, [text, audioCache, audioContext, cacheVersion, soundEnabled, disabled]); 
 
   const playAudio = () => {
     stopAudio(); 
-    if (!text) return;
+    if (!text || disabled) return;
 
     // --- Silent Simulation Mode ---
     if (!soundEnabled) {
@@ -75,7 +82,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
         setIsPlaying(true);
 
         const tick = () => {
-            if (currentTextRef.current !== text) return; // Stale check
+            if (currentTextRef.current !== text || disabled) return; // Stale check
             
             const now = performance.now();
             const dt = now - lastFrameTime;
@@ -96,7 +103,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
                 // Use shorter timeout if speeding
                 const nextDelay = playbackSpeedRef.current > 1 ? 500 : 1000;
                 autoNextTimeoutRef.current = setTimeout(() => {
-                    onAutoNext();
+                    if (!disabled) onAutoNext();
                 }, nextDelay);
             }
         };
@@ -124,7 +131,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
         if (onProgressUpdate) onProgressUpdate(100);
         
         autoNextTimeoutRef.current = setTimeout(() => {
-            onAutoNext();
+            if (!disabled) onAutoNext();
         }, 1000); 
     };
 
@@ -134,7 +141,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     setIsPlaying(true);
 
     const updateProgress = () => {
-        if (audioContext && sourceNodeRef.current === source) {
+        if (audioContext && sourceNodeRef.current === source && !disabled) {
             const current = audioContext.currentTime - startTimeRef.current;
             const dur = buffer.duration;
             const p = Math.min(100, (current / dur) * 100);
@@ -165,7 +172,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
     }
     setIsPlaying(false);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (onProgressUpdate) onProgressUpdate(0);
+    if (onProgressUpdate && disabled) onProgressUpdate(0); // Reset progress if disabled
   };
 
   return null;
