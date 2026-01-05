@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
 import { AudioNarrator } from './components/AudioNarrator'; 
-import { BackgroundAudio } from './components/BackgroundAudio';
+import { ProceduralBackgroundAudio } from './components/ProceduralBackgroundAudio';
 import { MatrixBackground } from './components/MatrixBackground'; 
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
@@ -409,10 +409,10 @@ export default function App() {
     <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
       
       {/* Background Music System */}
-      <BackgroundAudio 
+      <ProceduralBackgroundAudio 
          isPlaying={soundEnabled} 
          isNarrating={narratorActive} 
-         volume={0.25} // Mid-tempo ambient level
+         volume={0.4} 
       />
 
       {/* Transition Overlay (z-500) */}

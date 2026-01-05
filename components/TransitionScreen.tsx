@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MatrixBackground } from './MatrixBackground';
 
 interface TransitionScreenProps {
@@ -9,6 +9,8 @@ interface TransitionScreenProps {
 
 export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, lessonNumber, title }) => {
   const [showContent, setShowContent] = useState(false);
+  const [decodedTitle, setDecodedTitle] = useState("");
+  const frameRef = useRef<number>(0);
 
   useEffect(() => {
     if (isVisible) {
@@ -17,8 +19,35 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
       return () => clearTimeout(timer);
     } else {
       setShowContent(false);
+      setDecodedTitle("");
     }
   }, [isVisible]);
+
+  // Matrix-style Text Decoder Effect
+  useEffect(() => {
+    if (!showContent) return;
+    
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#%&";
+    let iteration = 0;
+    
+    const animateText = () => {
+        const result = title.split("").map((char, index) => {
+            if (index < iteration) return char;
+            return characters[Math.floor(Math.random() * characters.length)];
+        }).join("");
+        
+        setDecodedTitle(result);
+        
+        if (iteration < title.length) {
+            iteration += 0.5; // Controls speed
+            frameRef.current = requestAnimationFrame(animateText);
+        }
+    };
+    
+    animateText();
+    return () => cancelAnimationFrame(frameRef.current);
+
+  }, [showContent, title]);
 
   return (
     <div 
@@ -41,8 +70,8 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
         <div 
             className={`mt-[-2rem] transition-all duration-1000 delay-300 ease-out transform ${showContent ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'}`}
         >
-             <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 cyber-font text-center shadow-cyan-500/50 drop-shadow-lg">
-                {title}
+             <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 cyber-font text-center shadow-cyan-500/50 drop-shadow-lg min-h-[1.2em]">
+                {decodedTitle || title}
              </h1>
         </div>
 

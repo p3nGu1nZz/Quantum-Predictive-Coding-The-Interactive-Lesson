@@ -108,7 +108,7 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
                 setIsPlaying(false);
                 // Trigger auto next
                 // Use shorter timeout if speeding
-                const nextDelay = playbackSpeedRef.current > 1 ? 500 : 1000;
+                const nextDelay = playbackSpeedRef.current > 1 ? 500 : 3000; // Increased to 3s for readability
                 autoNextTimeoutRef.current = setTimeout(() => {
                     if (!disabled) onAutoNext();
                 }, nextDelay);
@@ -137,9 +137,10 @@ export const AudioNarrator: React.FC<AudioNarratorProps> = ({
         
         if (onProgressUpdate) onProgressUpdate(100);
         
+        // Increased delay to 3000ms (3 seconds) to allow user to read the final step
         autoNextTimeoutRef.current = setTimeout(() => {
             if (!disabled) onAutoNext();
-        }, 1000); 
+        }, 3000); 
     };
 
     source.start(0);
