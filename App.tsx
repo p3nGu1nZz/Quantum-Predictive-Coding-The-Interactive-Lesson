@@ -8,7 +8,7 @@ import { TransitionScreen } from './components/TransitionScreen';
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
-import { Activity, ChevronLeft, ChevronRight, FastForward } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, FastForward, Volume2, VolumeX } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
 // --- IndexedDB Utils ---
@@ -299,9 +299,11 @@ export default function App() {
           }, 50);
           
           try {
-              await loadAudioImmediate(LESSON_STEPS[0], 0);
-              setCacheVersion(v => v + 1);
-              loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+              if (soundEnabled) {
+                  await loadAudioImmediate(LESSON_STEPS[0], 0);
+                  setCacheVersion(v => v + 1);
+                  loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+              }
           } catch (e) {
               console.error("Audio Load Error:", e);
           } finally {
@@ -321,13 +323,16 @@ export default function App() {
       if (!hasStarted) return;
       
       const current = LESSON_STEPS[stepIndex];
-      fetchAudioForStep(current, stepIndex);
-      
-      const nextStep = LESSON_STEPS[stepIndex + 1];
-      if (nextStep) {
-          fetchAudioForStep(nextStep, stepIndex + 1);
+      // Only attempt fetch if sound is enabled. 
+      // This effect will re-run when soundEnabled changes, ensuring we fetch missed audio.
+      if (soundEnabled) {
+          fetchAudioForStep(current, stepIndex);
+          const nextStep = LESSON_STEPS[stepIndex + 1];
+          if (nextStep) {
+              fetchAudioForStep(nextStep, stepIndex + 1);
+          }
       }
-  }, [stepIndex, hasStarted]);
+  }, [stepIndex, hasStarted, soundEnabled]);
 
   const handleUpdate = useCallback((newParticles: Particle[]) => {
      latestParticlesRef.current = newParticles;
@@ -345,10 +350,8 @@ export default function App() {
           const nextStep = LESSON_STEPS[nextIndex];
           setTransitionTarget({ number: nextIndex + 1, title: nextStep.title });
           
-          // Wait 2.5s (2500ms) for transition animation before actually changing content
           setTimeout(() => {
               setStepIndex(nextIndex);
-              // Small buffer to allow render to catch up before fading curtain out
               setTimeout(() => {
                   setIsTransitioning(false);
               }, 100);
@@ -361,8 +364,6 @@ export default function App() {
 
   const handlePrevStep = () => {
       if (stepIndex > 0) {
-          // Simple transition back without the fancy screen to keep flow quick, or use it too?
-          // Using it for consistency but maybe shorter? Let's stick to standard change for back.
           setStepIndex(prev => prev - 1);
       }
   };
@@ -420,9 +421,18 @@ export default function App() {
       <div className="flex flex-1 w-full relative overflow-hidden">
           <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
              <div className="p-8 pb-4 shrink-0">
-                 <div className="flex items-center gap-2 mb-2 opacity-50">
-                     <Activity size={16} className="text-cyan-500 animate-pulse" />
-                     <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode // {soundEnabled ? "Auto-Seq" : "Manual"}</span>
+                 <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
+                     <div className="flex items-center gap-2">
+                        <Activity size={16} className="text-cyan-500 animate-pulse" />
+                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
+                     </div>
+                     <button 
+                        onClick={() => setSoundEnabled(!soundEnabled)} 
+                        className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
+                        title={soundEnabled ? "Mute Narration" : "Enable Narration"}
+                     >
+                         {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                     </button>
                  </div>
                  <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
                      {currentStep.title}
@@ -485,34 +495,35 @@ export default function App() {
                 <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
             </div>
 
-            {!soundEnabled && (
-                <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
-                    <button 
-                        onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
-                        className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
-                        title="Toggle Speed 1x/4x"
-                    >
-                        <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
-                    </button>
-                    <button 
-                        onClick={handlePrevStep} 
-                        disabled={stepIndex === 0}
-                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
+            {/* Manual Controls - Visible when sound is disabled or just always available for manual override */}
+            <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
+                <button 
+                    onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                    className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                    title="Toggle Speed 1x/4x"
+                >
+                    <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                </button>
+                <button 
+                    onClick={handlePrevStep} 
+                    disabled={stepIndex === 0}
+                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+                {!soundEnabled && (
                     <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
                         Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
                     </div>
-                    <button 
-                        onClick={attemptNextStep} 
-                        disabled={isFinished}
-                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                    >
-                        <ChevronRight size={24} />
-                    </button>
-                </div>
-            )}
+                )}
+                <button 
+                    onClick={attemptNextStep} 
+                    disabled={isFinished}
+                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                >
+                    <ChevronRight size={24} />
+                </button>
+            </div>
           </div>
       </div>
 
