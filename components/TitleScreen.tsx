@@ -1,17 +1,16 @@
 import React from 'react';
-import { Radio, ChevronRight, Zap, Atom, Volume2, VolumeX } from 'lucide-react';
+import { Radio, ChevronRight, Zap, Atom } from 'lucide-react';
 import { MatrixBackground } from './MatrixBackground';
 
 interface TitleScreenProps {
   initStatus: 'idle' | 'loading' | 'ready';
   loadingProgress: number;
-  loadingStatus?: string; // New Prop
+  loadingStatus?: string;
   onInitialize: () => void;
   soundEnabled: boolean;
-  onToggleSound: () => void;
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, loadingStatus, onInitialize, soundEnabled, onToggleSound }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, loadingStatus, onInitialize, soundEnabled }) => {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center font-serif select-none z-[100]">
       <MatrixBackground />
@@ -98,16 +97,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                         )}
                     </div>
                 </button>
-
-                {initStatus === 'idle' && (
-                    <button 
-                        onClick={onToggleSound}
-                        className={`flex items-center gap-2 px-4 py-2 rounded border text-xs uppercase tracking-widest font-mono transition-all opacity-80 hover:opacity-100 ${soundEnabled ? 'border-cyan-900 text-cyan-500 hover:bg-cyan-950/30' : 'border-slate-800 text-slate-600 hover:text-slate-400'}`}
-                    >
-                        {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                        <span>{soundEnabled ? "Sound Enabled" : "Sound Disabled"}</span>
-                    </button>
-                )}
                 
                 {/* Decorative subtext */}
                 <div className="mt-4 text-slate-600 font-mono text-[10px] space-y-1 opacity-60">

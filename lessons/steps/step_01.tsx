@@ -26,25 +26,21 @@ export const Step01: LessonStep = {
     ],
     config: p({ couplingEnabled: true, k: 0.05 }), setup: 'grid', symbols: [],
     script: [ 
-        // Initial state: Panel Top Left
-        { at: 0, type: 'panel', panel: { x: 5, y: 5, w: '30vw', opacity: 1 } },
-        
+        // Start with panel in standard position
+        { at: 0, type: 'panel', panel: { x: 5, y: 15, w: '30vw', opacity: 1, scale: 1 } },
         { at: 10, type: 'highlight', targetId: 'all', label: "Rigid Structure" }, 
         
-        // Narration talks about "Nature" and "Murmuration" - Video plays
-        // Move panel to Bottom Right to reveal video content
-        { at: 28, type: 'panel', panel: { x: 65, y: 60, w: '30vw', opacity: 0.9 } },
-        
+        // As narration shifts to "Nature", move panel to bottom right and make slightly transparent to show video
+        { at: 28, type: 'panel', panel: { x: 60, y: 55, w: '35vw', opacity: 0.9, scale: 1 } },
         { at: 35, type: 'shake', targetId: 'all', duration: 20, label: "Nature's Motion" }, 
         
-        // "We step into the L-Group" - Reset panel to Center Left but smaller
-        { at: 58, type: 'panel', panel: { x: 5, y: 25, w: '25vw', opacity: 1 } },
+        // "Liquid model" - Move panel back to left but lower down
+        { at: 58, type: 'panel', panel: { x: 5, y: 30, w: '30vw', opacity: 1, scale: 1 } },
         { at: 60, type: 'reset' }, 
-        
         { at: 70, type: 'spawn', targetId: 'all', label: "Liquid Mind" },
         
-        // "Physics-based intelligence" - Expand panel for MathBlock visibility
-        { at: 80, type: 'panel', panel: { x: 5, y: 5, w: '40vw', opacity: 1 } }
+        // Final section - Expand panel width for math block
+        { at: 80, type: 'panel', panel: { x: 5, y: 10, w: '45vw', opacity: 1, scale: 1 } }
     ],
     videoScript: [
         { 

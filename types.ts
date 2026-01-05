@@ -89,7 +89,7 @@ export interface ScriptedEvent {
   value?: number; // Used for generic magnitude or Tab Index
   targetZoom?: number; 
   targetPan?: Vector2;
-  panel?: PanelConfig; // New: Procedural Panel Control
+  panel?: PanelConfig; // Procedural Panel Control
 }
 
 export interface VideoClip {

@@ -8,8 +8,8 @@ import { MatrixBackground } from './components/MatrixBackground';
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
 import { IntroScene } from './components/IntroScene';
-import { CinematicBackground } from './components/CinematicBackground'; // New
-import { AdminPanel } from './components/AdminPanel'; // New
+import { CinematicBackground } from './components/CinematicBackground'; 
+import { AdminPanel } from './components/AdminPanel'; 
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent, VideoClip, PanelConfig } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
@@ -75,7 +75,7 @@ export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [initStatus, setInitStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
   const [loadingProgress, setLoadingProgress] = useState(0); 
-  const [loadingStatus, setLoadingStatus] = useState("Initializing..."); // New status text state
+  const [loadingStatus, setLoadingStatus] = useState("Initializing..."); 
   const [currentPlaybackProgress, setCurrentPlaybackProgress] = useState(0); 
   const [cacheVersion, setCacheVersion] = useState(0); 
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -104,13 +104,22 @@ export default function App() {
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
-  const fetchingRef = useRef<Set<string>>(new Set());
-  const isQuotaExceeded = useRef(false); 
   const latestParticlesRef = useRef<Particle[]>(particles);
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
   const [currentConfig, setCurrentConfig] = useState(currentStep.config);
   
   const isIntro = stepIndex === 0;
+
+  // --- GLOBAL KEY LISTENER ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === '`' || e.key === '~') {
+            setShowAdmin(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // --- INITIALIZATION & STEP CHANGE ---
   useEffect(() => {
@@ -126,8 +135,13 @@ export default function App() {
     setSelectedParticle(null);
     setCurrentVideoBlob(null); // Reset video
     
-    // Reset Panel Default Position on Step Change
-    setPanelConfig({ x: 5, y: 5, w: '30vw', opacity: 1, scale: 1 });
+    // Reset Panel Default Position on Step Change unless scripted otherwise immediately
+    const initialScriptPanel = currentStep.script?.find(s => s.at === 0 && s.type === 'panel')?.panel;
+    if (initialScriptPanel) {
+        setPanelConfig(initialScriptPanel);
+    } else {
+        setPanelConfig({ x: 5, y: 5, w: '30vw', opacity: 1, scale: 1 });
+    }
   }, [stepIndex, currentStep]);
 
   // --- VIDEO TIMELINE LOGIC ---
@@ -137,11 +151,16 @@ export default function App() {
           return;
       }
 
+      // Check for videos starting at 0 immediately or based on progress
+      // We look for the MOST RECENT video start time that is <= current progress
       const activeClip = [...currentStep.videoScript]
           .sort((a,b) => b.at - a.at)
           .find(clip => currentPlaybackProgress >= clip.at);
 
       if (activeClip) {
+          // Optimization: Only fetch if ID changed
+          // We rely on the blob logic in CinematicBackground to ignore redundant updates, 
+          // but better to check here to avoid DB hits
           getVideoFromDB(activeClip.id).then(blob => {
               if (blob) setCurrentVideoBlob(blob);
               else setCurrentVideoBlob(null);
@@ -175,7 +194,7 @@ export default function App() {
           setLastSfxTrigger(evt);
       }
       // Procedural Panel Control
-      if (evt.panel) {
+      if (evt.type === 'panel' && evt.panel) {
           setPanelConfig(prev => ({ ...prev, ...evt.panel }));
       }
   }, []);
@@ -189,7 +208,7 @@ export default function App() {
   }
 
   const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
-      if (!process.env.API_KEY || isQuotaExceeded.current) return null;
+      if (!process.env.API_KEY) return null;
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const response = await ai.models.generateContent({
@@ -204,16 +223,14 @@ export default function App() {
               for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
               return bytes.buffer;
           }
-      } catch (e: any) { 
-          if (e.toString().includes('429')) isQuotaExceeded.current = true;
-      }
+      } catch (e: any) { console.error(e); }
       return null;
   };
 
   const loadAudioImmediate = async (step: LessonStep, stepIdx: number): Promise<boolean> => {
       if (!soundEnabled || !step.narration) return true;
       const text = step.narration;
-      const cacheKey = `step_${stepIdx}`; 
+      const cacheKey = `step_${stepIdx}_v1`; // Versioning keys if text changes often
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       if (audioCacheRef.current.has(text)) return true;
 
@@ -237,11 +254,14 @@ export default function App() {
 
   const fetchAudioBuffer = async (step: LessonStep): Promise<ArrayBuffer | undefined> => {
        if(!step.narration) return undefined;
-       const key = `step_${LESSON_STEPS.indexOf(step)}`;
+       const key = `step_${LESSON_STEPS.indexOf(step)}_v1`;
        const cached = await getAudioFromDB(key);
        if(cached) return cached.buffer;
        const gen = await generateSpeech(step.narration);
-       if(gen) return gen;
+       if(gen) {
+           saveAudioToDB(key, step.narration, gen); // CRITICAL FIX: Save generated audio to DB
+           return gen;
+       }
        return undefined;
   };
 
@@ -266,14 +286,11 @@ export default function App() {
                   const step1Loaded = await loadAudioImmediate(LESSON_STEPS[1], 1);
                   if (step1Loaded) setLoadingStatus("Loaded Lesson 1");
 
-                  // Check if Video exists for Step 1
-                  if (LESSON_STEPS[1].videoScript?.length) {
-                      const clip = LESSON_STEPS[1].videoScript[0];
-                      setLoadingStatus(`Checking Video: ${clip.id}...`);
+                  // Check if Video exists for Intro or Step 1
+                  if (LESSON_STEPS[0].videoScript?.length) {
+                      const clip = LESSON_STEPS[0].videoScript[0];
                       const vid = await getVideoFromDB(clip.id);
                       if (vid) setLoadingStatus(`Cached Video Found: ${clip.id}`);
-                      else setLoadingStatus(`Missing Video: ${clip.id}`);
-                      await new Promise(r => setTimeout(r, 600)); // Delay to read message
                   }
               }
           } catch (e) { 
@@ -328,19 +345,28 @@ export default function App() {
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
 
   return (
-    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative font-sans select-none">
+    <div className={`flex flex-col w-full h-screen bg-black overflow-hidden relative font-sans select-none ${showAdmin ? 'cursor-default' : 'cursor-none'}`}>
       
       <ProceduralBackgroundAudio isPlaying={soundEnabled && (initStatus !== 'idle')} volume={narratorActive ? 0.15 : 0.4} mode={hasStarted ? 'lesson' : 'title'} />
       <SoundEffects trigger={lastSfxTrigger} soundEnabled={soundEnabled} />
+
+      {/* --- ADMIN PANEL (ALWAYS AVAILABLE VIA HOTKEY) --- */}
+      <AdminPanel 
+            isOpen={showAdmin} 
+            onClose={() => setShowAdmin(false)} 
+            lessonSteps={LESSON_STEPS} 
+            fetchAudioForStep={fetchAudioBuffer}
+            soundEnabled={soundEnabled}
+            onToggleSound={() => setSoundEnabled(prev => !prev)}
+      />
 
       {!hasStarted && (
         <TitleScreen 
             initStatus={initStatus} 
             loadingProgress={loadingProgress} 
-            loadingStatus={loadingStatus} // Pass new prop
+            loadingStatus={loadingStatus} 
             onInitialize={handleTitleAction} 
             soundEnabled={soundEnabled}
-            onToggleSound={() => setSoundEnabled(prev => !prev)}
         />
       )}
 
@@ -370,14 +396,11 @@ export default function App() {
                 onPlayStateChange={setNarratorActive}
             />
 
-            {/* --- ADMIN PANEL --- */}
-            <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} lessonSteps={LESSON_STEPS} fetchAudioForStep={fetchAudioBuffer} />
-
             {/* --- MAIN LAYOUT --- */}
             <div className="flex-1 w-full h-full relative overflow-hidden">
                 
                 {/* 1. CINEMATIC BACKGROUND LAYER (Video) */}
-                <CinematicBackground videoBlob={currentVideoBlob} isActive={!isIntro} />
+                <CinematicBackground videoBlob={currentVideoBlob} isActive={true} />
 
                 {/* 2. PARTICLE SIMULATION LAYER (Overlay) */}
                 <div className="absolute inset-0 z-10 pointer-events-none">
@@ -421,6 +444,7 @@ export default function App() {
                                     <Activity size={14} className="text-cyan-400 animate-pulse" />
                                     <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-cyan-400">DATA FEED</span>
                                 </div>
+                                {/* Volume Toggle inside Panel */}
                                 <button 
                                     onClick={() => setSoundEnabled(!soundEnabled)} 
                                     className={`transition-colors ${soundEnabled ? 'text-cyan-400 hover:text-cyan-200' : 'text-slate-500'}`}
@@ -463,50 +487,35 @@ export default function App() {
                 {/* INTRO OVERLAY */}
                 {isIntro && <IntroScene progress={currentPlaybackProgress} subsections={currentStep.subsections} />}
 
-                {/* HUD CONTROLS */}
-                <div className="absolute top-6 left-6 z-50 flex gap-4 pointer-events-auto">
-                    <button 
-                        onClick={() => setShowInfoPanel(!showInfoPanel)} 
-                        className="p-2 bg-black/50 border border-slate-700 text-cyan-400 hover:text-white rounded hover:bg-cyan-900/40 transition-colors backdrop-blur-sm"
-                        title={showInfoPanel ? "Hide Panel" : "Show Panel"}
-                    >
-                        {showInfoPanel ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                    <button 
-                        onClick={() => setShowAdmin(true)} 
-                        className="p-2 bg-black/50 border border-slate-700 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors backdrop-blur-sm"
-                        title="Admin / Assets"
-                    >
-                        <Settings size={20} />
-                    </button>
-                </div>
+                {/* HUD CONTROLS - ONLY SHOW IF SOUND DISABLED (MANUAL MODE) */}
+                {!soundEnabled && (
+                    <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50 pointer-events-auto animate-fade-in">
+                        <button 
+                            onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                            className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                        >
+                            <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                        </button>
+                        <button 
+                            onClick={handlePrevStep} 
+                            disabled={stepIndex === 0}
+                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+                        >
+                            <ChevronLeft size={24} />
+                        </button>
+                        <button 
+                            onClick={attemptNextStep} 
+                            disabled={isFinished}
+                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+                        >
+                            <ChevronRight size={24} />
+                        </button>
+                    </div>
+                )}
 
                 <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none z-20">
                     <div className="text-6xl font-bold text-white/10 cyber-font">{stepIndex}</div>
                     <div className="text-xs font-mono text-cyan-400/50 tracking-widest uppercase">Sequence ID</div>
-                </div>
-
-                <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50 pointer-events-auto">
-                    <button 
-                        onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
-                        className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
-                    >
-                        <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
-                    </button>
-                    <button 
-                        onClick={handlePrevStep} 
-                        disabled={stepIndex === 0}
-                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
-                    <button 
-                        onClick={attemptNextStep} 
-                        disabled={isFinished}
-                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
-                    >
-                        <ChevronRight size={24} />
-                    </button>
                 </div>
             </div>
         </>
