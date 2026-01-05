@@ -27,6 +27,11 @@ interface Spark {
   color: string;
 }
 
+// Helper: Dynamic Tanh (Eq 15)
+const dynamicTanh = (x: number, alpha2: number = 1.0, alpha3: number = 1.0) => {
+    return alpha2 * Math.tanh(alpha3 * x);
+};
+
 export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   particles: initialParticles,
   config,
@@ -59,7 +64,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const wavefrontsRef = useRef<{x:number, y:number, r:number, life:number}[]>([]);
   const sparksRef = useRef<Spark[]>([]);
   
-  // New: Trails Reference
   const trailsRef = useRef<Map<number, Vector2[]>>(new Map());
   
   const triggeredEventsRef = useRef<Set<number>>(new Set());
@@ -215,30 +219,47 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             const d2 = dx*dx + dy*dy;
             const d = Math.sqrt(d2);
 
+            // Eq 14 & Eq 30: Gaussian Decay exp(-d^2 / sigma^2)
             const spatialDecay = Math.exp(-d2 / (config.sigma * config.sigma));
+            
+            // Eq 18: Spin Modulation M(si, sj) = 1 + gamma * si * sj
+            // We use gamma = 4.0 for enhanced effect
             const spinFactor = config.spinEnabled ? (1 + 4.0 * p1.spin * p2.spin) : 1.0;
             
-            let phaseFactor = 1.0;
+            // Eq 16 / Eq 30: Phase Synchronization (Cosine Term)
+            // p_ij ~ cos(phi_i - phi_j)
+            const deltaPhi = p2.phase - p1.phase;
+            let phaseCouplingStrength = 1.0;
+            
             if (config.phaseEnabled) {
-                const deltaPhi = p2.phase - p1.phase;
-                const syncStrength = 0.05 * spatialDecay; 
+                // Dynamic phase evolution
+                // Based on Kuramoto: dphi/dt = omega + K * sin(delta)
+                const syncStrength = 0.05 * spatialDecay * Math.abs(spinFactor); 
                 phaseDeltas[i] += syncStrength * Math.sin(deltaPhi);
                 phaseDeltas[j] -= syncStrength * Math.sin(deltaPhi);
-                phaseFactor = 0.5 * (1 + Math.cos(deltaPhi)); 
+                
+                // Effective coupling visual strength modulated by phase alignment
+                // cos(delta) maps -1..1. We map to 0..1 for opacity
+                phaseCouplingStrength = 0.5 * (1 + Math.cos(deltaPhi)); 
             }
 
-            const coupling = spatialDecay * Math.abs(spinFactor);
+            // Total Vibrational Coupling Probability (Eq 14/30)
+            const coupling = spatialDecay * Math.abs(spinFactor) * phaseCouplingStrength;
 
-            if (coupling > 0.1 && config.couplingEnabled) {
-                newInteractions.push({ p1: p1.id, p2: p2.id, strength: 1.0, distance: d, coupling: coupling * phaseFactor });
+            if (coupling > 0.05 && config.couplingEnabled) {
+                newInteractions.push({ p1: p1.id, p2: p2.id, strength: 1.0, distance: d, coupling });
                 
+                // Force Derivation (Eq 8): Fij = -k(dij - r0) d_hat
                 const targetDist = config.r0;
                 const displacement = d - targetDist;
                 let effectiveK = config.k;
 
-                if (config.spinEnabled && spinFactor < 0) effectiveK *= -0.5;
+                // Spin-orbit coupling effect on force sign (repulsion/attraction flip)
+                if (config.spinEnabled && spinFactor < 0) effectiveK *= -0.5; // Repulsive if spins anti-aligned
 
                 let forceMag = -effectiveK * displacement;
+                
+                // Apply force along unit vector
                 const unitX = dx / d;
                 const unitY = dy / d;
                 
@@ -281,9 +302,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         
         if (p.isFixed) return { ...p, scale, visible };
 
+        // Spatial Update (Eq 29): dr/dt proportional to force (overdamped)
         let newVelX = p.vel.x * config.damping + netForces[i].x + shakeX;
         let newVelY = p.vel.y * config.damping + netForces[i].y + shakeY;
         
+        // Thermal Noise (Langevin)
         newVelX += (Math.random() - 0.5) * config.temperature;
         newVelY += (Math.random() - 0.5) * config.temperature;
 
@@ -311,12 +334,10 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         if (scale > 1.01) scale *= 0.95;
         if (scale < 0.99) scale += 0.05;
 
-        // --- TRAIL LOGIC ---
         const trail = trailsRef.current.get(p.id) || [];
         trail.push({x: nextX, y: nextY});
         if (trail.length > 20) trail.shift();
         trailsRef.current.set(p.id, trail);
-        // -------------------
 
         return { ...p, pos: { x: nextX, y: nextY }, vel: { x: newVelX, y: newVelY }, phase: newPhase, scale, visible };
     });
@@ -348,7 +369,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
 
             const spreadX = maxX - minX;
             const spreadY = maxY - minY;
-            // Robust padding: At least 150px or 20% of the spread
             const padding = Math.max(150, Math.max(spreadX, spreadY) * 0.2); 
 
             const width = Math.max(300, spreadX + padding * 2);
@@ -358,7 +378,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
             const scaleY = CANVAS_HEIGHT / height;
             
             targetZoom = Math.min(scaleX, scaleY);
-            targetZoom = Math.max(0.1, Math.min(2.0, targetZoom)); // Limit zoom range
+            targetZoom = Math.max(0.1, Math.min(2.0, targetZoom)); 
 
             const centerX = (minX + maxX) / 2;
             const centerY = (minY + maxY) / 2;
@@ -367,7 +387,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         }
     }
 
-    // Smooth Interpolation
     cameraStateRef.current.zoom += (targetZoom - cameraStateRef.current.zoom) * 0.05;
     cameraStateRef.current.pan.x += (targetPanX - cameraStateRef.current.pan.x) * 0.05;
     cameraStateRef.current.pan.y += (targetPanY - cameraStateRef.current.pan.y) * 0.05;
@@ -407,7 +426,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 canvas.height = containerSize.height;
              }
 
-             // CLEAR RECT IS ESSENTIAL FOR TRANSPARENCY
              ctx.clearRect(0, 0, canvas.width, canvas.height);
 
              const { zoom, pan } = cameraStateRef.current;
@@ -428,7 +446,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
              const ps = particlesRef.current;
              const config = configRef.current;
              
-             // Background Tensor Field Visualization
              const tensorGridSize = 60;
              const boundsPad = 200;
              const startX = Math.floor((vbX - boundsPad) / tensorGridSize) * tensorGridSize;
@@ -470,7 +487,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 }
              }
 
-             // Render Interactions
              interactionsRef.current.forEach(int => {
                  const p1 = ps.find(p => p.id === int.p1);
                  const p2 = ps.find(p => p.id === int.p2);
@@ -489,19 +505,17 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  }
              });
 
-             // Render Particles & Trails
              ps.forEach(p => {
                  if (p.visible === false) return;
                  const currentScale = p.scale || 1.0;
                  const dynamicColor = getParticleColor(p);
 
-                 // Draw Trails
                  const trail = trailsRef.current.get(p.id);
                  if (trail && trail.length > 1) {
                      for (let i = 0; i < trail.length - 1; i++) {
                          const pt1 = trail[i];
                          const pt2 = trail[i + 1];
-                         const opacity = (i / trail.length) * 0.5; // Fade tail
+                         const opacity = (i / trail.length) * 0.5; 
 
                          ctx.beginPath();
                          ctx.moveTo(pt1.x, pt1.y);
@@ -513,7 +527,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                      ctx.globalAlpha = 1.0;
                  }
 
-                 // Draw Force Indicators
                  if (p.force && (Math.abs(p.force.x) > 0.1 || Math.abs(p.force.y) > 0.1)) {
                      const fMag = Math.sqrt(p.force.x*p.force.x + p.force.y*p.force.y);
                      const visualLen = 40 * Math.tanh(fMag * 0.1); 
@@ -532,7 +545,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                      ctx.globalAlpha = 1.0;
                  }
 
-                 // Draw Particle Body
                  const radius = 8 * currentScale;
                  ctx.shadowBlur = 20 * currentScale;
                  ctx.shadowColor = dynamicColor;
@@ -548,7 +560,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  ctx.fill();
              });
 
-             // Wavefronts
              wavefrontsRef.current.forEach(w => {
                  ctx.beginPath();
                  ctx.strokeStyle = `rgba(6, 182, 212, ${w.life})`; 
@@ -556,7 +567,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                  ctx.stroke();
              });
 
-             // Script Labels
              scriptRef.current.forEach(evt => {
                 const end = evt.at + (evt.duration || 10);
                 if (progressRef.current >= evt.at && progressRef.current < end && evt.label) {

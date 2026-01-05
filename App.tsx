@@ -12,7 +12,7 @@ import { CinematicBackground } from './components/CinematicBackground';
 import { AdminPanel } from './components/AdminPanel'; 
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent, VideoClip, PanelConfig } from './types';
 import { createParticles } from './lessons/setups';
-import { LESSON_STEPS } from './lessons/content';
+import { LESSON_STEPS as STATIC_LESSON_STEPS } from './lessons/content';
 import { Activity, ChevronLeft, ChevronRight, FastForward, Volume2, VolumeX, Settings, PanelLeftOpen, PanelLeftClose, Eye, EyeOff } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -21,6 +21,8 @@ const AUDIO_DB = 'QuantumPCN_AudioDB';
 const AUDIO_STORE = 'audio_pcm_cache';
 const VIDEO_DB = 'QuantumPCN_VideoDB';
 const VIDEO_STORE = 'videos';
+const SYSTEM_DB = 'QuantumPCN_SystemDB';
+const METADATA_STORE = 'lesson_metadata';
 
 // Audio DB
 const openAudioDB = (): Promise<IDBDatabase> => {
@@ -31,6 +33,7 @@ const openAudioDB = (): Promise<IDBDatabase> => {
             if(!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
         };
         req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
     });
 };
 
@@ -46,12 +49,27 @@ const openVideoDB = (): Promise<IDBDatabase> => {
     });
 };
 
+// System DB (For Metadata like extra clips)
+const openSystemDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(SYSTEM_DB, 1);
+        req.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if(!db.objectStoreNames.contains(METADATA_STORE)) db.createObjectStore(METADATA_STORE);
+            if(!db.objectStoreNames.contains('session_state')) db.createObjectStore('session_state');
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+};
+
 const getAudioFromDB = async (key: string): Promise<{text:string, buffer:ArrayBuffer} | undefined> => {
     try {
         const db = await openAudioDB();
         return new Promise(resolve => {
             const req = db.transaction(AUDIO_STORE, 'readonly').objectStore(AUDIO_STORE).get(key);
             req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(undefined);
         });
     } catch { return undefined; }
 };
@@ -62,13 +80,19 @@ const getVideoFromDB = async (key: string): Promise<Blob | undefined> => {
         return new Promise(resolve => {
             const req = db.transaction(VIDEO_STORE, 'readonly').objectStore(VIDEO_STORE).get(key);
             req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(undefined);
         });
     } catch { return undefined; }
 };
 
 const saveAudioToDB = async (key: string, text: string, data: ArrayBuffer) => {
     const db = await openAudioDB();
-    db.transaction(AUDIO_STORE, 'readwrite').objectStore(AUDIO_STORE).put({text, buffer:data}, key);
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(AUDIO_STORE, 'readwrite');
+        tx.objectStore(AUDIO_STORE).put({text, buffer:data}, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
 };
 
 export default function App() {
@@ -82,6 +106,7 @@ export default function App() {
   const [narratorActive, setNarratorActive] = useState(false); 
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFinished, setIsFinished] = useState(false);
+  const [isPaused, setIsPaused] = useState(false); // Global Pause State
   
   const [stepIndex, setStepIndex] = useState(0);
   const [particles, setParticles] = useState<Particle[]>(createParticles('grid'));
@@ -101,11 +126,17 @@ export default function App() {
   const [panelConfig, setPanelConfig] = useState<PanelConfig>({ x: 5, y: 5, w: '30vw', opacity: 1, scale: 1 });
   const [showAdmin, setShowAdmin] = useState(false);
   const [currentVideoBlob, setCurrentVideoBlob] = useState<Blob | null>(null);
+  
+  // Seek State for AudioNarrator
+  const [seekTarget, setSeekTarget] = useState<number | null>(null);
+
+  // Dynamic Lessons State (Merged static + dynamic)
+  const [lessonSteps, setLessonSteps] = useState<LessonStep[]>(STATIC_LESSON_STEPS);
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const latestParticlesRef = useRef<Particle[]>(particles);
-  const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
+  const currentStep = lessonSteps[stepIndex] || lessonSteps[0];
   const [currentConfig, setCurrentConfig] = useState(currentStep.config);
   
   const isIntro = stepIndex === 0;
@@ -116,16 +147,22 @@ export default function App() {
         if (e.key === '`' || e.key === '~') {
             setShowAdmin(prev => !prev);
         }
+        if (e.key === ' ' && hasStarted && !isTransitioning) {
+            setIsPaused(prev => !prev);
+        }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [hasStarted, isTransitioning]);
 
   // --- INITIALIZATION & STEP CHANGE ---
   useEffect(() => {
     setCurrentConfig(currentStep.config);
     setActiveSubsectionIndex(0); 
-    setCurrentPlaybackProgress(0); 
+    // Only reset progress if we aren't seeking to a specific point via admin panel
+    if (seekTarget === null) {
+        setCurrentPlaybackProgress(0); 
+    }
     setCameraMode('auto'); 
     setManualZoom(1);
     setManualPan({ x: 0, y: 0 });
@@ -144,6 +181,41 @@ export default function App() {
     }
   }, [stepIndex, currentStep]);
 
+  // --- LOAD DYNAMIC METADATA ---
+  useEffect(() => {
+      const loadMetadata = async () => {
+          try {
+              const db = await openSystemDB();
+              const tx = db.transaction(METADATA_STORE, 'readonly');
+              const req = tx.objectStore(METADATA_STORE).get('video_clips_v1');
+              req.onsuccess = () => {
+                  const extraClips = req.result as Record<number, VideoClip[]> | undefined;
+                  if (extraClips) {
+                      const mergedSteps = STATIC_LESSON_STEPS.map((step, idx) => {
+                          const extras = extraClips[idx] || [];
+                          // Merge existing script with extras
+                          const existing = step.videoScript || [];
+                          // Avoid duplicates by ID
+                          const combined = [...existing];
+                          extras.forEach(extra => {
+                              if (!combined.find(c => c.id === extra.id)) {
+                                  combined.push(extra);
+                              }
+                          });
+                          return { ...step, videoScript: combined };
+                      });
+                      setLessonSteps(mergedSteps);
+                  }
+              };
+          } catch(e) { console.warn("Failed to load dynamic clips", e); }
+      };
+      loadMetadata();
+  }, []);
+
+  const handleUpdateLessonSteps = (newSteps: LessonStep[]) => {
+      setLessonSteps(newSteps);
+  };
+
   // --- VIDEO TIMELINE LOGIC ---
   useEffect(() => {
       if (!currentStep.videoScript) {
@@ -151,16 +223,11 @@ export default function App() {
           return;
       }
 
-      // Check for videos starting at 0 immediately or based on progress
-      // We look for the MOST RECENT video start time that is <= current progress
       const activeClip = [...currentStep.videoScript]
           .sort((a,b) => b.at - a.at)
           .find(clip => currentPlaybackProgress >= clip.at);
 
       if (activeClip) {
-          // Optimization: Only fetch if ID changed
-          // We rely on the blob logic in CinematicBackground to ignore redundant updates, 
-          // but better to check here to avoid DB hits
           getVideoFromDB(activeClip.id).then(blob => {
               if (blob) setCurrentVideoBlob(blob);
               else setCurrentVideoBlob(null);
@@ -230,23 +297,21 @@ export default function App() {
   const loadAudioImmediate = async (step: LessonStep, stepIdx: number): Promise<boolean> => {
       if (!soundEnabled || !step.narration) return true;
       const text = step.narration;
-      const cacheKey = `step_${stepIdx}_v1`; // Versioning keys if text changes often
+      const cacheKey = `step_${stepIdx}_v1`; 
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       if (audioCacheRef.current.has(text)) return true;
 
       const cached = await getAudioFromDB(cacheKey);
       if (cached && cached.text === text) {
-          // Found in cache
           audioCacheRef.current.set(text, decodePCM(cached.buffer, audioContextRef.current));
           return true;
       }
       
-      // Not in cache, need to generate
       setLoadingStatus(`Generating Audio: ${step.title.slice(0, 15)}...`);
       const generated = await generateSpeech(text);
       if (generated) {
           audioCacheRef.current.set(text, decodePCM(generated, audioContextRef.current));
-          saveAudioToDB(cacheKey, text, generated);
+          await saveAudioToDB(cacheKey, text, generated);
           return true;
       }
       return false;
@@ -254,12 +319,24 @@ export default function App() {
 
   const fetchAudioBuffer = async (step: LessonStep): Promise<ArrayBuffer | undefined> => {
        if(!step.narration) return undefined;
-       const key = `step_${LESSON_STEPS.indexOf(step)}_v1`;
+       const key = `step_${lessonSteps.indexOf(step)}_v1`;
        const cached = await getAudioFromDB(key);
-       if(cached) return cached.buffer;
+       if(cached) {
+            if (audioContextRef.current && !audioCacheRef.current.has(step.narration)) {
+                try {
+                    audioCacheRef.current.set(step.narration, decodePCM(cached.buffer, audioContextRef.current));
+                } catch(e) { console.warn("Audio decode error (cached)", e); }
+            }
+            return cached.buffer;
+       }
        const gen = await generateSpeech(step.narration);
        if(gen) {
-           saveAudioToDB(key, step.narration, gen); // CRITICAL FIX: Save generated audio to DB
+           await saveAudioToDB(key, step.narration, gen);
+           if (audioContextRef.current) {
+                try {
+                    audioCacheRef.current.set(step.narration, decodePCM(gen, audioContextRef.current));
+                } catch(e) { console.warn("Audio decode error (new)", e); }
+           }
            return gen;
        }
        return undefined;
@@ -276,19 +353,16 @@ export default function App() {
           const progressInterval = setInterval(() => { setLoadingProgress(prev => prev >= 95 ? prev : prev + 0.5); }, 50);
           try {
               if (soundEnabled) {
-                  // Load Intro
                   setLoadingStatus("Checking Audio Cache: Lesson 0...");
-                  const introLoaded = await loadAudioImmediate(LESSON_STEPS[0], 0);
+                  const introLoaded = await loadAudioImmediate(lessonSteps[0], 0);
                   if (introLoaded) setLoadingStatus("Loaded Lesson 0");
 
-                  // Load Step 1
                   setLoadingStatus("Checking Audio Cache: Lesson 1...");
-                  const step1Loaded = await loadAudioImmediate(LESSON_STEPS[1], 1);
+                  const step1Loaded = await loadAudioImmediate(lessonSteps[1], 1);
                   if (step1Loaded) setLoadingStatus("Loaded Lesson 1");
 
-                  // Check if Video exists for Intro or Step 1
-                  if (LESSON_STEPS[0].videoScript?.length) {
-                      const clip = LESSON_STEPS[0].videoScript[0];
+                  if (lessonSteps[0].videoScript?.length) {
+                      const clip = lessonSteps[0].videoScript[0];
                       const vid = await getVideoFromDB(clip.id);
                       if (vid) setLoadingStatus(`Cached Video Found: ${clip.id}`);
                   }
@@ -305,7 +379,7 @@ export default function App() {
       } else if (initStatus === 'ready') {
           if (audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
           setIsTransitioning(true);
-          setTransitionTarget({ number: 0, title: LESSON_STEPS[0].title });
+          setTransitionTarget({ number: 0, title: lessonSteps[0].title });
           setHasStarted(true);
           setTimeout(() => { setIsTransitioning(false); }, 4500);
       }
@@ -313,10 +387,10 @@ export default function App() {
 
   useEffect(() => {
       if (!hasStarted) return;
-      const current = LESSON_STEPS[stepIndex];
+      const current = lessonSteps[stepIndex];
       if (soundEnabled) {
           loadAudioImmediate(current, stepIndex).then(() => setCacheVersion(v => v + 1));
-          const nextStep = LESSON_STEPS[stepIndex + 1];
+          const nextStep = lessonSteps[stepIndex + 1];
           if (nextStep) loadAudioImmediate(nextStep, stepIndex + 1);
       }
   }, [stepIndex, hasStarted, soundEnabled]);
@@ -331,9 +405,9 @@ export default function App() {
 
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
-      if (nextIndex < LESSON_STEPS.length) {
+      if (nextIndex < lessonSteps.length) {
           setIsTransitioning(true);
-          setTransitionTarget({ number: nextIndex, title: LESSON_STEPS[nextIndex].title });
+          setTransitionTarget({ number: nextIndex, title: lessonSteps[nextIndex].title });
           setTimeout(() => {
               setStepIndex(nextIndex);
               setTimeout(() => { setIsTransitioning(false); }, 50); 
@@ -341,23 +415,47 @@ export default function App() {
       } else { setIsFinished(true); }
   };
 
+  const handleSeek = (newStepIndex: number, progressPercent: number) => {
+      if (newStepIndex !== stepIndex) {
+          setIsTransitioning(false);
+          setStepIndex(newStepIndex);
+          setSeekTarget(progressPercent);
+      } else {
+          setSeekTarget(progressPercent);
+      }
+      setCurrentPlaybackProgress(progressPercent);
+  };
+
+  useEffect(() => {
+      if (seekTarget !== null) {
+          const t = setTimeout(() => setSeekTarget(null), 100);
+          return () => clearTimeout(t);
+      }
+  }, [seekTarget]);
+
   const handlePrevStep = () => { if (stepIndex > 0) setStepIndex(prev => prev - 1); };
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
 
   return (
     <div className={`flex flex-col w-full h-screen bg-black overflow-hidden relative font-sans select-none ${showAdmin ? 'cursor-default' : 'cursor-none'}`}>
       
-      <ProceduralBackgroundAudio isPlaying={soundEnabled && (initStatus !== 'idle')} volume={narratorActive ? 0.15 : 0.4} mode={hasStarted ? 'lesson' : 'title'} />
+      <ProceduralBackgroundAudio isPlaying={soundEnabled && (initStatus !== 'idle') && !isPaused} volume={narratorActive ? 0.15 : 0.4} mode={hasStarted ? 'lesson' : 'title'} />
       <SoundEffects trigger={lastSfxTrigger} soundEnabled={soundEnabled} />
 
       {/* --- ADMIN PANEL (ALWAYS AVAILABLE VIA HOTKEY) --- */}
       <AdminPanel 
             isOpen={showAdmin} 
             onClose={() => setShowAdmin(false)} 
-            lessonSteps={LESSON_STEPS} 
+            lessonSteps={lessonSteps} 
             fetchAudioForStep={fetchAudioBuffer}
             soundEnabled={soundEnabled}
             onToggleSound={() => setSoundEnabled(prev => !prev)}
+            currentStepIndex={stepIndex}
+            currentProgress={currentPlaybackProgress}
+            onSeek={handleSeek}
+            onUpdateLessonSteps={handleUpdateLessonSteps}
+            isPlaying={!isPaused}
+            onTogglePlay={() => setIsPaused(prev => !prev)}
       />
 
       {!hasStarted && (
@@ -393,16 +491,13 @@ export default function App() {
                 soundEnabled={soundEnabled}
                 playbackSpeed={playbackSpeed}
                 disabled={isTransitioning} 
+                paused={isPaused} // NEW: Explicit Pause State
                 onPlayStateChange={setNarratorActive}
+                seekTo={seekTarget} 
             />
 
-            {/* --- MAIN LAYOUT --- */}
             <div className="flex-1 w-full h-full relative overflow-hidden">
-                
-                {/* 1. CINEMATIC BACKGROUND LAYER (Video) */}
                 <CinematicBackground videoBlob={currentVideoBlob} isActive={true} />
-
-                {/* 2. PARTICLE SIMULATION LAYER (Overlay) */}
                 <div className="absolute inset-0 z-10 pointer-events-none">
                     <div className="w-full h-full pointer-events-auto">
                         <SimulationCanvas 
@@ -410,7 +505,7 @@ export default function App() {
                             config={currentConfig} 
                             onUpdate={handleUpdate}
                             onSelectParticle={setSelectedParticle}
-                            isRunning={isRunning && !isTransitioning} 
+                            isRunning={isRunning && !isTransitioning && !isPaused} 
                             interactionMode="perturb" 
                             cameraMode={cameraMode}
                             manualZoom={manualZoom}
@@ -423,7 +518,6 @@ export default function App() {
                     </div>
                 </div>
                 
-                {/* 3. FLOATING INFO PANEL (Procedural TV Style) */}
                 {!isIntro && showInfoPanel && (
                     <div 
                         className="absolute z-30 transition-all duration-1000 ease-in-out backdrop-blur-md bg-black/70 border border-cyan-900/50 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex flex-col"
@@ -444,7 +538,6 @@ export default function App() {
                                     <Activity size={14} className="text-cyan-400 animate-pulse" />
                                     <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-cyan-400">DATA FEED</span>
                                 </div>
-                                {/* Volume Toggle inside Panel */}
                                 <button 
                                     onClick={() => setSoundEnabled(!soundEnabled)} 
                                     className={`transition-colors ${soundEnabled ? 'text-cyan-400 hover:text-cyan-200' : 'text-slate-500'}`}
@@ -477,17 +570,14 @@ export default function App() {
                             )}
                         </div>
                         
-                        {/* Decorative footer line */}
                         <div className="h-1 w-full bg-slate-900 mt-auto">
                             <div className="h-full bg-cyan-500/50" style={{ width: `${currentPlaybackProgress}%`, transition: 'width 0.2s linear' }}></div>
                         </div>
                     </div>
                 )}
 
-                {/* INTRO OVERLAY */}
                 {isIntro && <IntroScene progress={currentPlaybackProgress} subsections={currentStep.subsections} />}
 
-                {/* HUD CONTROLS - ONLY SHOW IF SOUND DISABLED (MANUAL MODE) */}
                 {!soundEnabled && (
                     <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50 pointer-events-auto animate-fade-in">
                         <button 
