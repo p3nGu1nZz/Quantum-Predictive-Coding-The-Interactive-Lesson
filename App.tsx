@@ -8,75 +8,78 @@ import { MatrixBackground } from './components/MatrixBackground';
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
 import { IntroScene } from './components/IntroScene';
-import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent } from './types';
+import { CinematicBackground } from './components/CinematicBackground'; // New
+import { AdminPanel } from './components/AdminPanel'; // New
+import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent, VideoClip, PanelConfig } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
-import { Activity, ChevronLeft, ChevronRight, FastForward, Volume2, VolumeX } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, FastForward, Volume2, VolumeX, Settings, PanelLeftOpen, PanelLeftClose, Eye, EyeOff } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
 // --- IndexedDB Utils ---
-const DB_NAME = 'QuantumPCN_AudioDB';
-const STORE_NAME = 'audio_pcm_cache';
-const DB_VERSION = 2; 
+const AUDIO_DB = 'QuantumPCN_AudioDB';
+const AUDIO_STORE = 'audio_pcm_cache';
+const VIDEO_DB = 'QuantumPCN_VideoDB';
+const VIDEO_STORE = 'videos';
 
-interface CachedAudio {
-    text: string;
-    buffer: ArrayBuffer;
-}
-
-const openDB = (): Promise<IDBDatabase> => {
+// Audio DB
+const openAudioDB = (): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
+        const req = indexedDB.open(AUDIO_DB, 2);
+        req.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if(!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
         };
+        req.onsuccess = () => resolve(req.result);
     });
 };
 
-const getAudioFromDB = async (key: string): Promise<CachedAudio | undefined> => {
-    try {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(key);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    } catch (e) {
-        return undefined;
-    }
+// Video DB
+const openVideoDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(VIDEO_DB, 1);
+        req.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result;
+            if(!db.objectStoreNames.contains(VIDEO_STORE)) db.createObjectStore(VIDEO_STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+    });
 };
 
-const saveAudioToDB = async (key: string, text: string, data: ArrayBuffer): Promise<void> => {
+const getAudioFromDB = async (key: string): Promise<{text:string, buffer:ArrayBuffer} | undefined> => {
     try {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const item: CachedAudio = { text, buffer: data };
-            const request = store.put(item, key);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+        const db = await openAudioDB();
+        return new Promise(resolve => {
+            const req = db.transaction(AUDIO_STORE, 'readonly').objectStore(AUDIO_STORE).get(key);
+            req.onsuccess = () => resolve(req.result);
         });
-    } catch (e) {
-        console.warn("IDB Save Error", e);
-    }
+    } catch { return undefined; }
+};
+
+const getVideoFromDB = async (key: string): Promise<Blob | undefined> => {
+    try {
+        const db = await openVideoDB();
+        return new Promise(resolve => {
+            const req = db.transaction(VIDEO_STORE, 'readonly').objectStore(VIDEO_STORE).get(key);
+            req.onsuccess = () => resolve(req.result);
+        });
+    } catch { return undefined; }
+};
+
+const saveAudioToDB = async (key: string, text: string, data: ArrayBuffer) => {
+    const db = await openAudioDB();
+    db.transaction(AUDIO_STORE, 'readwrite').objectStore(AUDIO_STORE).put({text, buffer:data}, key);
 };
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
   const [initStatus, setInitStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
-  const [loadingProgress, setLoadingProgress] = useState(0);   
+  const [loadingProgress, setLoadingProgress] = useState(0); 
+  const [loadingStatus, setLoadingStatus] = useState("Initializing..."); // New status text state
   const [currentPlaybackProgress, setCurrentPlaybackProgress] = useState(0); 
   const [cacheVersion, setCacheVersion] = useState(0); 
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [narratorActive, setNarratorActive] = useState(false); // For music ducking
+  const [narratorActive, setNarratorActive] = useState(false); 
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFinished, setIsFinished] = useState(false);
   
@@ -88,30 +91,28 @@ export default function App() {
   const [cameraMode, setCameraMode] = useState<'auto' | 'manual'>('auto');
   const [manualZoom, setManualZoom] = useState(1);
   const [manualPan, setManualPan] = useState<Vector2>({ x: 0, y: 0 });
-  
   const [activeSubsectionIndex, setActiveSubsectionIndex] = useState(0); 
-  
-  // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<{number: number, title: string} | null>(null);
-  
-  // SFX Trigger State
   const [lastSfxTrigger, setLastSfxTrigger] = useState<ScriptedEvent | null>(null);
+
+  // New UI State
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [panelConfig, setPanelConfig] = useState<PanelConfig>({ x: 5, y: 5, w: '30vw', opacity: 1, scale: 1 });
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [currentVideoBlob, setCurrentVideoBlob] = useState<Blob | null>(null);
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const fetchingRef = useRef<Set<string>>(new Set());
-  const ttsQueue = useRef<Array<() => Promise<void>>>([]);
-  const isProcessingQueue = useRef(false);
   const isQuotaExceeded = useRef(false); 
-
   const latestParticlesRef = useRef<Particle[]>(particles);
-  
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
   const [currentConfig, setCurrentConfig] = useState(currentStep.config);
   
   const isIntro = stepIndex === 0;
 
+  // --- INITIALIZATION & STEP CHANGE ---
   useEffect(() => {
     setCurrentConfig(currentStep.config);
     setActiveSubsectionIndex(0); 
@@ -123,7 +124,30 @@ export default function App() {
     setParticles(newParticles);
     latestParticlesRef.current = newParticles;
     setSelectedParticle(null);
+    setCurrentVideoBlob(null); // Reset video
+    
+    // Reset Panel Default Position on Step Change
+    setPanelConfig({ x: 5, y: 5, w: '30vw', opacity: 1, scale: 1 });
   }, [stepIndex, currentStep]);
+
+  // --- VIDEO TIMELINE LOGIC ---
+  useEffect(() => {
+      if (!currentStep.videoScript) {
+          if(currentVideoBlob !== null) setCurrentVideoBlob(null);
+          return;
+      }
+
+      const activeClip = [...currentStep.videoScript]
+          .sort((a,b) => b.at - a.at)
+          .find(clip => currentPlaybackProgress >= clip.at);
+
+      if (activeClip) {
+          getVideoFromDB(activeClip.id).then(blob => {
+              if (blob) setCurrentVideoBlob(blob);
+              else setCurrentVideoBlob(null);
+          });
+      }
+  }, [currentPlaybackProgress, currentStep.videoScript]);
 
   useEffect(() => {
       if (currentStep.subsections) {
@@ -138,227 +162,145 @@ export default function App() {
   }, [currentPlaybackProgress, currentStep.subsections]);
 
   const handleScriptTrigger = useCallback((evt: ScriptedEvent) => {
-      // Logic triggers
       if (evt.type === 'zoom' && evt.targetZoom !== undefined) {
-          setManualZoom(evt.targetZoom);
-          setCameraMode('manual');
+          setManualZoom(evt.targetZoom); setCameraMode('manual');
       }
       if (evt.type === 'pan' && evt.targetPan !== undefined) {
-          setManualPan(evt.targetPan);
-          setCameraMode('manual');
+          setManualPan(evt.targetPan); setCameraMode('manual');
       }
       if (evt.type === 'reset') { 
-          setCameraMode('auto'); 
-          setManualZoom(1);
-          setManualPan({ x: 0, y: 0 });
+          setCameraMode('auto'); setManualZoom(1); setManualPan({ x: 0, y: 0 });
       }
-
-      // SFX triggers
       if (['pulse', 'shake', 'spawn', 'highlight', 'force'].includes(evt.type)) {
-          setLastSfxTrigger(evt); // Pass to SFX component
+          setLastSfxTrigger(evt);
       }
-
+      // Procedural Panel Control
+      if (evt.panel) {
+          setPanelConfig(prev => ({ ...prev, ...evt.panel }));
+      }
   }, []);
-
-  async function decodeFileAudioData(data: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> {
-    return ctx.decodeAudioData(data);
-  }
 
   function decodePCM(buffer: ArrayBuffer, ctx: AudioContext): AudioBuffer {
     const dataInt16 = new Int16Array(buffer);
-    const numChannels = 1; 
-    const sampleRate = 24000;
-    const frameCount = dataInt16.length; 
-    const audioBuffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    const audioBuffer = ctx.createBuffer(1, dataInt16.length, 24000);
     const channelData = audioBuffer.getChannelData(0);
-    for (let i = 0; i < frameCount; i++) {
-        channelData[i] = dataInt16[i] / 32768.0; 
-    }
+    for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0; 
     return audioBuffer;
   }
 
   const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
-      if (!process.env.API_KEY) return null;
-      if (isQuotaExceeded.current) return null; 
-
+      if (!process.env.API_KEY || isQuotaExceeded.current) return null;
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const response = await ai.models.generateContent({
               model: 'gemini-2.5-flash-preview-tts',
               contents: [{ parts: [{ text }] }],
-              config: {
-                  responseModalities: ['AUDIO'],
-                  speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
-              }
+              config: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } }
           });
           const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
           if (base64Audio) {
-              const binaryString = atob(base64Audio);
-              const len = binaryString.length;
-              const bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) { bytes[i] = binaryString.charCodeAt(i); }
+              const bin = atob(base64Audio);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
               return bytes.buffer;
           }
       } catch (e: any) { 
-          console.error("Gemini TTS Error:", e); 
-          if (e.toString().includes('429') || e.toString().includes('quota') || e.toString().includes('RESOURCE_EXHAUSTED')) {
-              console.warn("API Quota Exceeded. Disabling further TTS requests for this session.");
-              isQuotaExceeded.current = true;
-          }
+          if (e.toString().includes('429')) isQuotaExceeded.current = true;
       }
       return null;
   };
 
   const loadAudioImmediate = async (step: LessonStep, stepIdx: number): Promise<boolean> => {
-      if (!soundEnabled) return true; 
-      if (!step.narration) return true;
-      const textToSpeak = step.narration;
+      if (!soundEnabled || !step.narration) return true;
+      const text = step.narration;
       const cacheKey = `step_${stepIdx}`; 
-      
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      
-      if (audioCacheRef.current.has(textToSpeak)) return true;
+      if (audioCacheRef.current.has(text)) return true;
 
-      // 1. Try IndexedDB - Checks if cached text matches current text
-      let idbMiss = true;
-      try {
-          const cachedItem = await getAudioFromDB(cacheKey);
-          if (cachedItem && cachedItem.text === textToSpeak) {
-              // CACHE HIT: Text hasn't changed, use cached buffer
-              const buffer = decodePCM(cachedItem.buffer, audioContextRef.current);
-              audioCacheRef.current.set(textToSpeak, buffer); 
-              idbMiss = false;
-              return true;
-          }
-      } catch(e) { }
-
-      // 2. Fallback to API if DB miss or text changed
-      if (idbMiss && !isQuotaExceeded.current) {
-          const generatedBuffer = await generateSpeech(textToSpeak);
-          if (generatedBuffer) {
-              try {
-                  const buffer = decodePCM(generatedBuffer, audioContextRef.current);
-                  audioCacheRef.current.set(textToSpeak, buffer);
-                  // Save with new text, overwriting old if key exists
-                  saveAudioToDB(cacheKey, textToSpeak, generatedBuffer);
-                  return true;
-              } catch (e) { console.error(e); }
-          }
+      const cached = await getAudioFromDB(cacheKey);
+      if (cached && cached.text === text) {
+          // Found in cache
+          audioCacheRef.current.set(text, decodePCM(cached.buffer, audioContextRef.current));
+          return true;
       }
-
-      // 3. Last Resort: Try local file
-      try {
-          const paddedIndex = (stepIdx).toString().padStart(2, '0'); // stepIdx 0 is Intro
-          const filePath = `audio/step_${paddedIndex}.mp3`; 
-          const response = await fetch(filePath);
-          if (response.ok) {
-              const arrayBuffer = await response.arrayBuffer();
-              const buffer = await decodeFileAudioData(arrayBuffer, audioContextRef.current);
-              audioCacheRef.current.set(textToSpeak, buffer);
-              return true;
-          }
-      } catch (e) {}
-
+      
+      // Not in cache, need to generate
+      setLoadingStatus(`Generating Audio: ${step.title.slice(0, 15)}...`);
+      const generated = await generateSpeech(text);
+      if (generated) {
+          audioCacheRef.current.set(text, decodePCM(generated, audioContextRef.current));
+          saveAudioToDB(cacheKey, text, generated);
+          return true;
+      }
       return false;
   };
 
-  const processQueue = async () => {
-    if (isProcessingQueue.current || ttsQueue.current.length === 0) return;
-    isProcessingQueue.current = true;
-    const task = ttsQueue.current.shift();
-    if (task) { try { await task(); } catch (e) { console.error("Queue task failed", e); } }
-    setTimeout(() => {
-        isProcessingQueue.current = false;
-        if (ttsQueue.current.length > 0) processQueue();
-    }, 500);
-  };
-
-  const enqueueTask = (task: () => Promise<void>) => {
-      ttsQueue.current.push(task);
-      processQueue();
-  };
-
-  const fetchAudioForStep = async (step: LessonStep, stepIdx: number): Promise<void> => {
-      if (!soundEnabled) return;
-      if (!step.narration) return;
-      const textToSpeak = step.narration;
-      
-      const cacheKey = `step_${stepIdx}`;
-      if (isQuotaExceeded.current) {
-          const cached = await getAudioFromDB(cacheKey);
-          if (cached && cached.text === textToSpeak) {
-               if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-               const buffer = decodePCM(cached.buffer, audioContextRef.current);
-               audioCacheRef.current.set(textToSpeak, buffer);
-               return;
-          }
-      }
-
-      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCacheRef.current.has(textToSpeak) || fetchingRef.current.has(textToSpeak)) return; 
-      fetchingRef.current.add(textToSpeak);
-
-      enqueueTask(async () => {
-         await loadAudioImmediate(step, stepIdx);
-         setCacheVersion(v => v + 1);
-         fetchingRef.current.delete(textToSpeak);
-      });
+  const fetchAudioBuffer = async (step: LessonStep): Promise<ArrayBuffer | undefined> => {
+       if(!step.narration) return undefined;
+       const key = `step_${LESSON_STEPS.indexOf(step)}`;
+       const cached = await getAudioFromDB(key);
+       if(cached) return cached.buffer;
+       const gen = await generateSpeech(step.narration);
+       if(gen) return gen;
+       return undefined;
   };
 
   const handleTitleAction = async () => {
       if (initStatus === 'idle') {
           setInitStatus('loading');
+          setLoadingStatus("Connecting to Audio Subsystem...");
           
-          // Start Audio System if not already
           if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-          if (audioContextRef.current.state === 'suspended') {
-              audioContextRef.current.resume();
-          }
+          if (audioContextRef.current.state === 'suspended') audioContextRef.current.resume();
 
-          const progressInterval = setInterval(() => {
-              setLoadingProgress(prev => prev >= 95 ? prev : prev + 0.5);
-          }, 50);
-          
+          const progressInterval = setInterval(() => { setLoadingProgress(prev => prev >= 95 ? prev : prev + 0.5); }, 50);
           try {
               if (soundEnabled) {
-                  await loadAudioImmediate(LESSON_STEPS[0], 0);
-                  setCacheVersion(v => v + 1);
-                  loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
+                  // Load Intro
+                  setLoadingStatus("Checking Audio Cache: Lesson 0...");
+                  const introLoaded = await loadAudioImmediate(LESSON_STEPS[0], 0);
+                  if (introLoaded) setLoadingStatus("Loaded Lesson 0");
+
+                  // Load Step 1
+                  setLoadingStatus("Checking Audio Cache: Lesson 1...");
+                  const step1Loaded = await loadAudioImmediate(LESSON_STEPS[1], 1);
+                  if (step1Loaded) setLoadingStatus("Loaded Lesson 1");
+
+                  // Check if Video exists for Step 1
+                  if (LESSON_STEPS[1].videoScript?.length) {
+                      const clip = LESSON_STEPS[1].videoScript[0];
+                      setLoadingStatus(`Checking Video: ${clip.id}...`);
+                      const vid = await getVideoFromDB(clip.id);
+                      if (vid) setLoadingStatus(`Cached Video Found: ${clip.id}`);
+                      else setLoadingStatus(`Missing Video: ${clip.id}`);
+                      await new Promise(r => setTimeout(r, 600)); // Delay to read message
+                  }
               }
-          } catch (e) {
+          } catch (e) { 
               console.error("Audio Load Error:", e);
+              setLoadingStatus("Error Loading Assets");
           } finally {
               clearInterval(progressInterval);
               setLoadingProgress(100);
-              setInitStatus('ready');
+              setLoadingStatus("Systems Ready");
+              setTimeout(() => setInitStatus('ready'), 500);
           }
       } else if (initStatus === 'ready') {
-          if (audioContextRef.current?.state === 'suspended') {
-              await audioContextRef.current.resume();
-          }
-          
-          // --- BEGIN INTRO TRANSITION ---
+          if (audioContextRef.current?.state === 'suspended') await audioContextRef.current.resume();
           setIsTransitioning(true);
           setTransitionTarget({ number: 0, title: LESSON_STEPS[0].title });
-          setHasStarted(true); // Mount the main app behind the transition screen
-
-          // Wait 4500ms (Total 5000ms with fade out)
-          setTimeout(() => {
-              setIsTransitioning(false);
-          }, 4500);
+          setHasStarted(true);
+          setTimeout(() => { setIsTransitioning(false); }, 4500);
       }
   };
 
   useEffect(() => {
       if (!hasStarted) return;
-      
       const current = LESSON_STEPS[stepIndex];
       if (soundEnabled) {
-          fetchAudioForStep(current, stepIndex);
+          loadAudioImmediate(current, stepIndex).then(() => setCacheVersion(v => v + 1));
           const nextStep = LESSON_STEPS[stepIndex + 1];
-          if (nextStep) {
-              fetchAudioForStep(nextStep, stepIndex + 1);
-          }
+          if (nextStep) loadAudioImmediate(nextStep, stepIndex + 1);
       }
   }, [stepIndex, hasStarted, soundEnabled]);
 
@@ -373,54 +315,29 @@ export default function App() {
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
-          // Transition Logic - 5 Seconds Total Flow
-          // 0.5s Fade In + 4.0s Hold + 0.5s Fade Out = 5.0s
           setIsTransitioning(true);
-          const nextStep = LESSON_STEPS[nextIndex];
-          setTransitionTarget({ number: nextIndex, title: nextStep.title });
-          
+          setTransitionTarget({ number: nextIndex, title: LESSON_STEPS[nextIndex].title });
           setTimeout(() => {
               setStepIndex(nextIndex);
-              setTimeout(() => {
-                  setIsTransitioning(false);
-              }, 50); // Small buffer to ensure rendering
-          }, 4500); // 4500ms hold before fading out
-
-      } else {
-          setIsFinished(true);
-      }
+              setTimeout(() => { setIsTransitioning(false); }, 50); 
+          }, 4500);
+      } else { setIsFinished(true); }
   };
 
-  const handlePrevStep = () => {
-      if (stepIndex > 0) {
-          setStepIndex(prev => prev - 1);
-      }
-  };
-
+  const handlePrevStep = () => { if (stepIndex > 0) setStepIndex(prev => prev - 1); };
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
 
-  // Background Audio Mixing Constants
-  const BGM_BASE_VOL = 0.4;
-  const BGM_DUCKED_VOL = 0.15; // 37.5% of base volume for subtle ducking
-
   return (
-    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
+    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative font-sans select-none">
       
-      {/* GLOBAL AUDIO SYSTEM - MOUNTED AT ROOT */}
-      {/* Starts playing when user clicks Initialize on Title Screen */}
-      <ProceduralBackgroundAudio 
-         isPlaying={soundEnabled && (initStatus !== 'idle')} 
-         volume={narratorActive ? BGM_DUCKED_VOL : BGM_BASE_VOL} 
-         mode={hasStarted ? 'lesson' : 'title'} 
-      />
-
+      <ProceduralBackgroundAudio isPlaying={soundEnabled && (initStatus !== 'idle')} volume={narratorActive ? 0.15 : 0.4} mode={hasStarted ? 'lesson' : 'title'} />
       <SoundEffects trigger={lastSfxTrigger} soundEnabled={soundEnabled} />
 
-      {/* RENDER TITLE SCREEN IF NOT STARTED */}
       {!hasStarted && (
         <TitleScreen 
             initStatus={initStatus} 
             loadingProgress={loadingProgress} 
+            loadingStatus={loadingStatus} // Pass new prop
             onInitialize={handleTitleAction} 
             soundEnabled={soundEnabled}
             onToggleSound={() => setSoundEnabled(prev => !prev)}
@@ -432,22 +349,14 @@ export default function App() {
              <MatrixBackground />
              <div className="relative z-10 text-center">
                  <h1 className="text-6xl text-white font-bold mb-4 cyber-font tracking-widest glitch-text">LESSON COMPLETE</h1>
-                 <p className="text-xl text-cyan-400 font-mono mb-8">System Standby. Thank you for participating.</p>
-                 <div className="w-24 h-1 bg-cyan-500 mx-auto shadow-[0_0_20px_#06b6d4]"></div>
+                 <p className="text-xl text-cyan-400 font-mono mb-8">System Standby.</p>
              </div>
           </div>
       )}
 
-      {/* MAIN APP CONTENT - HIDDEN UNTIL STARTED */}
       {hasStarted && !isFinished && (
         <>
-            {/* Transition Overlay (z-500) */}
-            <TransitionScreen 
-                isVisible={isTransitioning} 
-                lessonNumber={transitionTarget?.number || 0} 
-                title={transitionTarget?.title || ""} 
-            />
-
+            <TransitionScreen isVisible={isTransitioning} lessonNumber={transitionTarget?.number || 0} title={transitionTarget?.title || ""} />
             <AudioNarrator 
                 text={currentStep.narration || ""} 
                 onAutoNext={attemptNextStep} 
@@ -458,76 +367,27 @@ export default function App() {
                 soundEnabled={soundEnabled}
                 playbackSpeed={playbackSpeed}
                 disabled={isTransitioning} 
-                onPlayStateChange={setNarratorActive} // Trigger ducking
+                onPlayStateChange={setNarratorActive}
             />
 
-            {/* Main Content Area */}
-            <div className="flex flex-1 w-full relative overflow-hidden">
-                
-                {/* STANDARD LEFT SIDEBAR - HIDDEN DURING INTRO */}
-                {!isIntro && (
-                    <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
-                        <div className="p-8 pb-4 shrink-0">
-                            <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Activity size={16} className="text-cyan-500 animate-pulse" />
-                                    <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
-                                </div>
-                                <button 
-                                    onClick={() => setSoundEnabled(!soundEnabled)} 
-                                    className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
-                                    title={soundEnabled ? "Mute Narration" : "Enable Narration"}
-                                >
-                                    {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                                </button>
-                            </div>
-                            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
-                                {currentStep.title}
-                            </h1>
-                            <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
-                        </div>
-                        
-                        <div 
-                            className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
-                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
-                            <style>{`
-                                ::-webkit-scrollbar { display: none; }
-                            `}</style>
-                            <div className="h-full flex flex-col transition-all duration-500">
-                                {activeSubsection ? (
-                                    <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
-                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
-                                            <span>{activeSubsection.title}</span>
-                                            <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
-                                        </div>
-                                        <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
-                                            {activeSubsection.content}
-                                        </div>
-                                        {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
-                                    </div>
-                                ) : (
-                                    <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
-                                        {currentStep.content}
-                                        <SymbolTable symbols={currentStep.symbols} />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
+            {/* --- ADMIN PANEL --- */}
+            <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} lessonSteps={LESSON_STEPS} fetchAudioForStep={fetchAudioBuffer} />
 
-                {/* RIGHT PANEL / FULL SCREEN CANVAS */}
-                <div className={`${isIntro ? 'w-full absolute inset-0 z-0' : 'w-[60%] relative'} h-full bg-black transition-all duration-500`}>
-                    <MatrixBackground />
-                    
-                    <div className="absolute inset-0">
+            {/* --- MAIN LAYOUT --- */}
+            <div className="flex-1 w-full h-full relative overflow-hidden">
+                
+                {/* 1. CINEMATIC BACKGROUND LAYER (Video) */}
+                <CinematicBackground videoBlob={currentVideoBlob} isActive={!isIntro} />
+
+                {/* 2. PARTICLE SIMULATION LAYER (Overlay) */}
+                <div className="absolute inset-0 z-10 pointer-events-none">
+                    <div className="w-full h-full pointer-events-auto">
                         <SimulationCanvas 
                             particles={particles}
                             config={currentConfig} 
                             onUpdate={handleUpdate}
                             onSelectParticle={setSelectedParticle}
-                            isRunning={isRunning && !isTransitioning} // Pause sim during transition
+                            isRunning={isRunning && !isTransitioning} 
                             interactionMode="perturb" 
                             cameraMode={cameraMode}
                             manualZoom={manualZoom}
@@ -538,57 +398,116 @@ export default function App() {
                             onScriptTrigger={handleScriptTrigger}
                         />
                     </div>
-
-                    {/* INTRO SCENE OVERLAY */}
-                    {isIntro && (
-                        <IntroScene 
-                            progress={currentPlaybackProgress} 
-                            subsections={currentStep.subsections}
-                        />
-                    )}
-
-                    <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
-                        <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex}</div>
-                        <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
-                    </div>
-
-                    <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
-                        <button 
-                            onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
-                            className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
-                            title="Toggle Speed 1x/4x"
-                        >
-                            <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
-                        </button>
-                        <button 
-                            onClick={handlePrevStep} 
-                            disabled={stepIndex === 0}
-                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                        >
-                            <ChevronLeft size={24} />
-                        </button>
-                        {!soundEnabled && (
-                            <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
-                                Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
-                            </div>
-                        )}
-                        <button 
-                            onClick={attemptNextStep} 
-                            disabled={isFinished}
-                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                        >
-                            <ChevronRight size={24} />
-                        </button>
-                    </div>
                 </div>
-            </div>
+                
+                {/* 3. FLOATING INFO PANEL (Procedural TV Style) */}
+                {!isIntro && showInfoPanel && (
+                    <div 
+                        className="absolute z-30 transition-all duration-1000 ease-in-out backdrop-blur-md bg-black/70 border border-cyan-900/50 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] flex flex-col"
+                        style={{
+                            left: `${panelConfig.x}%`,
+                            top: `${panelConfig.y}%`,
+                            width: panelConfig.w || '30vw',
+                            height: panelConfig.h || 'auto',
+                            maxHeight: '80vh',
+                            opacity: panelConfig.opacity ?? 1,
+                            transform: `scale(${panelConfig.scale ?? 1})`,
+                            transformOrigin: 'top left'
+                        }}
+                    >
+                         <div className="p-6 pb-4 shrink-0 bg-gradient-to-b from-cyan-950/40 to-transparent border-b border-cyan-900/30">
+                            <div className="flex items-center gap-2 mb-2 opacity-80 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Activity size={14} className="text-cyan-400 animate-pulse" />
+                                    <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-cyan-400">DATA FEED</span>
+                                </div>
+                                <button 
+                                    onClick={() => setSoundEnabled(!soundEnabled)} 
+                                    className={`transition-colors ${soundEnabled ? 'text-cyan-400 hover:text-cyan-200' : 'text-slate-500'}`}
+                                >
+                                    {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                                </button>
+                            </div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white cyber-font leading-none drop-shadow-md">
+                                {currentStep.title}
+                            </h1>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-none">
+                             {activeSubsection ? (
+                                <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
+                                    <div className="flex justify-between items-end mb-4 border-b border-cyan-900/30 pb-2">
+                                        <span className="text-xs font-bold text-cyan-500 uppercase tracking-widest">{activeSubsection.title}</span>
+                                        <span className="text-[10px] font-mono text-slate-500">{Math.floor(currentPlaybackProgress)}%</span>
+                                    </div>
+                                    <div className="text-lg text-slate-200 leading-relaxed font-light font-serif drop-shadow-sm">
+                                        {activeSubsection.content}
+                                    </div>
+                                    {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+                                </div>
+                            ) : (
+                                <div className="text-lg text-slate-200 leading-relaxed font-light font-serif animate-fade-in">
+                                    {currentStep.content}
+                                    <SymbolTable symbols={currentStep.symbols} />
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Decorative footer line */}
+                        <div className="h-1 w-full bg-slate-900 mt-auto">
+                            <div className="h-full bg-cyan-500/50" style={{ width: `${currentPlaybackProgress}%`, transition: 'width 0.2s linear' }}></div>
+                        </div>
+                    </div>
+                )}
 
-            {/* Progress Bar Spanning Full Width at Bottom */}
-            <div className="h-2 bg-slate-900 w-full relative shrink-0 z-50">
-                <div 
-                    className="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-200 ease-linear"
-                    style={{ width: `${currentPlaybackProgress}%` }}
-                ></div>
+                {/* INTRO OVERLAY */}
+                {isIntro && <IntroScene progress={currentPlaybackProgress} subsections={currentStep.subsections} />}
+
+                {/* HUD CONTROLS */}
+                <div className="absolute top-6 left-6 z-50 flex gap-4 pointer-events-auto">
+                    <button 
+                        onClick={() => setShowInfoPanel(!showInfoPanel)} 
+                        className="p-2 bg-black/50 border border-slate-700 text-cyan-400 hover:text-white rounded hover:bg-cyan-900/40 transition-colors backdrop-blur-sm"
+                        title={showInfoPanel ? "Hide Panel" : "Show Panel"}
+                    >
+                        {showInfoPanel ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                    <button 
+                        onClick={() => setShowAdmin(true)} 
+                        className="p-2 bg-black/50 border border-slate-700 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors backdrop-blur-sm"
+                        title="Admin / Assets"
+                    >
+                        <Settings size={20} />
+                    </button>
+                </div>
+
+                <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none z-20">
+                    <div className="text-6xl font-bold text-white/10 cyber-font">{stepIndex}</div>
+                    <div className="text-xs font-mono text-cyan-400/50 tracking-widest uppercase">Sequence ID</div>
+                </div>
+
+                <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50 pointer-events-auto">
+                    <button 
+                        onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                        className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                    >
+                        <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                    </button>
+                    <button 
+                        onClick={handlePrevStep} 
+                        disabled={stepIndex === 0}
+                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <button 
+                        onClick={attemptNextStep} 
+                        disabled={isFinished}
+                        className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+                    >
+                        <ChevronRight size={24} />
+                    </button>
+                </div>
             </div>
         </>
       )}

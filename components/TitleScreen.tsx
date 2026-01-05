@@ -5,12 +5,13 @@ import { MatrixBackground } from './MatrixBackground';
 interface TitleScreenProps {
   initStatus: 'idle' | 'loading' | 'ready';
   loadingProgress: number;
+  loadingStatus?: string; // New Prop
   onInitialize: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, onInitialize, soundEnabled, onToggleSound }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, loadingStatus, onInitialize, soundEnabled, onToggleSound }) => {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center font-serif select-none z-[100]">
       <MatrixBackground />
@@ -61,7 +62,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                     onClick={onInitialize} 
                     disabled={initStatus === 'loading'}
                     className={`
-                        relative px-12 md:px-16 py-5 font-bold text-lg md:text-xl rounded-sm border transition-all flex items-center gap-4 cyber-font uppercase tracking-widest overflow-hidden group/btn
+                        relative px-12 md:px-16 py-5 font-bold text-lg md:text-xl rounded-sm border transition-all flex items-center gap-4 cyber-font uppercase tracking-widest overflow-hidden group/btn min-w-[300px] justify-center
                         ${initStatus === 'idle' ? 'bg-slate-950 hover:bg-cyan-950/30 text-cyan-50 border-cyan-800 hover:border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_50px_rgba(6,182,212,0.5)]' : ''}
                         ${initStatus === 'loading' ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-wait' : ''}
                         ${initStatus === 'ready' ? 'bg-emerald-950/50 border-emerald-400 text-emerald-100 shadow-[0_0_50px_rgba(16,185,129,0.5)] animate-pulse' : ''}
@@ -86,7 +87,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                         {initStatus === 'loading' && (
                             <>
                                 <Radio size={18} className="animate-spin text-cyan-400" />
-                                <span className="text-cyan-100">Uplink: {Math.floor(loadingProgress)}%</span>
+                                <span className="text-cyan-100 text-sm whitespace-nowrap">{loadingStatus || `Uplink: ${Math.floor(loadingProgress)}%`}</span>
                             </>
                         )}
                         {initStatus === 'ready' && (

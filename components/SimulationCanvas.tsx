@@ -407,6 +407,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
                 canvas.height = containerSize.height;
              }
 
+             // CLEAR RECT IS ESSENTIAL FOR TRANSPARENCY
              ctx.clearRect(0, 0, canvas.width, canvas.height);
 
              const { zoom, pan } = cameraStateRef.current;
@@ -589,7 +590,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   }, [animate]);
 
   return (
-    <div ref={containerRef} className="w-full h-full relative cursor-crosshair select-none">
+    <div ref={containerRef} className="w-full h-full relative cursor-crosshair select-none bg-transparent">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
     </div>
   );

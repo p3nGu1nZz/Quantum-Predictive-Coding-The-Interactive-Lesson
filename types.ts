@@ -70,16 +70,32 @@ export interface QuizQuestion {
   correctAnswer: string;
 }
 
+export interface PanelConfig {
+  x: number; // % from left
+  y: number; // % from top
+  w?: string; // CSS width (e.g. '30vw')
+  h?: string; // CSS height (e.g. 'auto')
+  opacity?: number;
+  scale?: number;
+}
+
 export interface ScriptedEvent {
   at: number; // 0-100 percentage of narration
   duration?: number;
-  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset' | 'setTab' | 'zoom' | 'pan' | 'rotate';
+  type: 'highlight' | 'force' | 'annotate' | 'spawn' | 'pulse' | 'shake' | 'reset' | 'setTab' | 'zoom' | 'pan' | 'rotate' | 'panel';
   targetId?: number | 'all' | 'center'; 
   label?: string; 
   vector?: Vector2; 
   value?: number; // Used for generic magnitude or Tab Index
   targetZoom?: number; 
   targetPan?: Vector2;
+  panel?: PanelConfig; // New: Procedural Panel Control
+}
+
+export interface VideoClip {
+  at: number; // Percentage 0-100 to start playing
+  prompt: string; // The prompt for Veo
+  id: string; // Unique ID for caching (usually stepId_index)
 }
 
 export interface LessonSubsection {
@@ -99,4 +115,5 @@ export interface LessonStep {
   narration?: string; 
   questions?: QuizQuestion[]; 
   script?: ScriptedEvent[]; 
+  videoScript?: VideoClip[]; // New: Veo Video Timeline
 }
