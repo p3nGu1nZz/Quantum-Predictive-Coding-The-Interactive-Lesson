@@ -326,10 +326,10 @@ export default function App() {
           setTransitionTarget({ number: 0, title: LESSON_STEPS[0].title });
           setHasStarted(true); // Mount the main app behind the transition screen
 
-          // Wait 5 seconds (5000ms) for the new intro transition
+          // Wait 4500ms (Total 5000ms with fade out)
           setTimeout(() => {
               setIsTransitioning(false);
-          }, 5000);
+          }, 4500);
       }
   };
 
@@ -357,7 +357,8 @@ export default function App() {
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
-          // Transition Logic - 5 Seconds Duration (Updated from 3s)
+          // Transition Logic - 5 Seconds Total Flow
+          // 0.5s Fade In + 4.0s Hold + 0.5s Fade Out = 5.0s
           setIsTransitioning(true);
           const nextStep = LESSON_STEPS[nextIndex];
           setTransitionTarget({ number: nextIndex, title: nextStep.title });
@@ -366,8 +367,8 @@ export default function App() {
               setStepIndex(nextIndex);
               setTimeout(() => {
                   setIsTransitioning(false);
-              }, 100); // Short delay to let React render the new step underneath before lifting curtain
-          }, 5000); // 5000ms full transition duration
+              }, 50); // Small buffer to ensure rendering
+          }, 4500); // 4500ms hold before fading out
 
       } else {
           setIsFinished(true);

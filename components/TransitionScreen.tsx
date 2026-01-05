@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { MatrixBackground } from './MatrixBackground';
-import { Loader } from 'lucide-react';
+import { Loader, Database, Cpu, Network, CheckCircle2 } from 'lucide-react';
 
 interface TransitionScreenProps {
   isVisible: boolean;
@@ -12,26 +12,49 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
   const [showContent, setShowContent] = useState(false);
   const [decodedTitle, setDecodedTitle] = useState("");
   const [loadPercent, setLoadPercent] = useState(0);
+  const [sysMsg, setSysMsg] = useState("INITIALIZING");
+  const [sysIcon, setSysIcon] = useState<React.ReactNode>(<Loader className="animate-spin" size={14} />);
   const frameRef = useRef<number>(0);
 
   useEffect(() => {
     if (isVisible) {
       // Reset state
       setLoadPercent(0);
-      const timer = setTimeout(() => setShowContent(true), 100);
-      return () => clearTimeout(timer);
+      setSysMsg("INITIALIZING SEQUENCE");
+      setSysIcon(<Loader className="animate-spin" size={14} />);
+      
+      const timer = setTimeout(() => setShowContent(true), 50);
+      
+      // Narrative Sequence (Total window ~4500ms active hold)
+      const seq = [
+          { t: 500, msg: "SAVING LOCAL STATE", icon: <Database className="animate-pulse" size={14} /> },
+          { t: 1500, msg: "FLUSHING MEMORY BUFFERS", icon: <Cpu className="animate-pulse" size={14} /> },
+          { t: 2500, msg: `LOADING MODULE ${lessonNumber.toString().padStart(2, '0')}`, icon: <Network className="animate-pulse" size={14} /> },
+          { t: 3800, msg: "CALIBRATING PHYSICS ENGINE", icon: <Loader className="animate-spin" size={14} /> },
+          { t: 4400, msg: "SYSTEM READY", icon: <CheckCircle2 className="text-emerald-500" size={14} /> }
+      ];
+
+      const timeouts = seq.map(s => setTimeout(() => {
+          setSysMsg(s.msg);
+          setSysIcon(s.icon);
+      }, s.t));
+
+      return () => {
+          clearTimeout(timer);
+          timeouts.forEach(clearTimeout);
+      };
     } else {
       setShowContent(false);
       setDecodedTitle("");
     }
-  }, [isVisible]);
+  }, [isVisible, lessonNumber]);
 
-  // Loading Bar Animation - Calibrated for 5 Seconds (5000ms)
+  // Loading Bar Animation - Calibrated for 4.5 Seconds (to finish right before fade out)
   useEffect(() => {
       if (!isVisible) return;
       
-      const updateInterval = 50; // Update every 50ms
-      const totalDuration = 4800; // Target ~4.8s to finish just before screen lift
+      const updateInterval = 30; 
+      const totalDuration = 4400; // Finish at 4.4s
       const increment = 100 / (totalDuration / updateInterval);
 
       const interval = setInterval(() => {
@@ -60,7 +83,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
         setDecodedTitle(result);
         
         if (iteration < title.length) {
-            iteration += 0.3; // Slower decoding speed for dramatic effect
+            iteration += 0.5; 
             frameRef.current = requestAnimationFrame(animateText);
         }
     };
@@ -72,7 +95,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
 
   return (
     <div 
-      className={`fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center transition-opacity duration-1000 pointer-events-none overflow-hidden ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center transition-opacity duration-500 pointer-events-none overflow-hidden ${isVisible ? 'opacity-100' : 'opacity-0'}`}
     >
       <MatrixBackground />
       
@@ -83,33 +106,34 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
         
         {/* Lesson Number Large */}
         <div 
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[20rem] font-bold text-slate-900/40 cyber-font tracking-tighter transition-all duration-1000 transform ${showContent ? 'scale-100 opacity-100' : 'scale-150 opacity-0'}`}
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[20rem] font-bold text-slate-900/40 cyber-font tracking-tighter transition-all duration-700 transform ${showContent ? 'scale-100 opacity-100' : 'scale-150 opacity-0'}`}
         >
             {lessonNumber === 0 ? "INTR" : lessonNumber.toString().padStart(2, '0')}
         </div>
 
         {/* Main Content */}
         <div className="relative z-20 text-center flex flex-col items-center">
-            <div className={`flex items-center gap-3 text-cyan-500 font-mono text-xs uppercase tracking-[0.4em] mb-6 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                <Loader size={12} className="animate-spin" />
-                <span>Initializing Neural Context</span>
+            {/* System Status Pill */}
+            <div className={`flex items-center gap-3 text-cyan-400 font-mono text-xs uppercase tracking-[0.2em] mb-8 bg-cyan-950/30 border border-cyan-900/50 px-4 py-1 rounded-full backdrop-blur-md transition-all duration-500 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                {sysIcon}
+                <span>{sysMsg}</span>
             </div>
 
-            <div className="h-20 flex items-center justify-center">
+            <div className="h-24 flex items-center justify-center">
                 <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-purple-500 cyber-font text-center shadow-cyan-500/50 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">
                     {decodedTitle || title}
                 </h1>
             </div>
 
             {/* Progress Bar */}
-            <div className={`mt-12 w-64 md:w-96 h-1 bg-slate-900 rounded-full overflow-hidden transition-all duration-1000 delay-300 ${showContent ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
+            <div className={`mt-12 w-64 md:w-96 h-1 bg-slate-900 rounded-full overflow-hidden transition-all duration-700 delay-200 ${showContent ? 'opacity-100 scale-100' : 'opacity-0 scale-90'}`}>
                 <div 
                     className="h-full bg-cyan-500 shadow-[0_0_10px_#22d3ee] transition-all duration-100 ease-linear"
                     style={{ width: `${loadPercent}%` }}
                 />
             </div>
             
-            <div className={`mt-2 flex justify-between w-64 md:w-96 text-[10px] font-mono text-slate-500 transition-opacity duration-500 delay-500 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`mt-2 flex justify-between w-64 md:w-96 text-[10px] font-mono text-slate-500 transition-opacity duration-500 delay-300 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
                 <span>SYS_LOAD</span>
                 <span>{Math.floor(loadPercent)}%</span>
             </div>
