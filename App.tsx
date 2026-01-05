@@ -6,6 +6,7 @@ import { ProceduralBackgroundAudio } from './components/ProceduralBackgroundAudi
 import { MatrixBackground } from './components/MatrixBackground'; 
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
+import { IntroScene } from './components/IntroScene';
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
@@ -104,6 +105,8 @@ export default function App() {
   
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
   const [currentConfig, setCurrentConfig] = useState(currentStep.config);
+  
+  const isIntro = stepIndex === 0;
 
   useEffect(() => {
     setCurrentConfig(currentStep.config);
@@ -437,57 +440,62 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex flex-1 w-full relative overflow-hidden">
-          <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
-             <div className="p-8 pb-4 shrink-0">
-                 <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
-                     <div className="flex items-center gap-2">
-                        <Activity size={16} className="text-cyan-500 animate-pulse" />
-                        <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
-                     </div>
-                     <button 
-                        onClick={() => setSoundEnabled(!soundEnabled)} 
-                        className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
-                        title={soundEnabled ? "Mute Narration" : "Enable Narration"}
-                     >
-                         {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                     </button>
-                 </div>
-                 <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
-                     {currentStep.title}
-                 </h1>
-                 <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
-             </div>
-             
-             <div 
-                className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-             >
-                 <style>{`
-                    ::-webkit-scrollbar { display: none; }
-                 `}</style>
-                 <div className="h-full flex flex-col transition-all duration-500">
-                    {activeSubsection ? (
-                        <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
-                            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
-                                <span>{activeSubsection.title}</span>
-                                <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
-                            </div>
-                            <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
-                                {activeSubsection.content}
-                            </div>
-                            {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+          
+          {/* STANDARD LEFT SIDEBAR - HIDDEN DURING INTRO */}
+          {!isIntro && (
+            <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
+                <div className="p-8 pb-4 shrink-0">
+                    <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
+                        <div className="flex items-center gap-2">
+                            <Activity size={16} className="text-cyan-500 animate-pulse" />
+                            <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
                         </div>
-                    ) : (
-                        <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
-                            {currentStep.content}
-                            <SymbolTable symbols={currentStep.symbols} />
-                        </div>
-                    )}
-                 </div>
-             </div>
-          </div>
+                        <button 
+                            onClick={() => setSoundEnabled(!soundEnabled)} 
+                            className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
+                            title={soundEnabled ? "Mute Narration" : "Enable Narration"}
+                        >
+                            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                        </button>
+                    </div>
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
+                        {currentStep.title}
+                    </h1>
+                    <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
+                </div>
+                
+                <div 
+                    className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                    <style>{`
+                        ::-webkit-scrollbar { display: none; }
+                    `}</style>
+                    <div className="h-full flex flex-col transition-all duration-500">
+                        {activeSubsection ? (
+                            <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
+                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
+                                    <span>{activeSubsection.title}</span>
+                                    <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
+                                </div>
+                                <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
+                                    {activeSubsection.content}
+                                </div>
+                                {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+                            </div>
+                        ) : (
+                            <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
+                                {currentStep.content}
+                                <SymbolTable symbols={currentStep.symbols} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+          )}
 
-          <div className="w-[60%] h-full relative bg-black">
+          {/* RIGHT PANEL / FULL SCREEN CANVAS */}
+          <div className={`${isIntro ? 'w-full absolute inset-0 z-0' : 'w-[60%] relative'} h-full bg-black transition-all duration-500`}>
             <MatrixBackground />
             
             <div className="absolute inset-0">
@@ -508,12 +516,22 @@ export default function App() {
                 />
             </div>
 
+            {/* INTRO SCENE OVERLAY */}
+            {isIntro && (
+                <IntroScene 
+                    progress={currentPlaybackProgress} 
+                    subsections={currentStep.subsections}
+                />
+            )}
+
             <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
                 <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex}</div>
                 <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
             </div>
 
             {/* Manual Controls - Visible when sound is disabled or just always available for manual override */}
+            {/* HIDE CONTROLS DURING INTRO UNLESS NEEDED (Let it play out or keep manual override?) */}
+            {/* Keeping manual override even in intro is good for debugging but maybe hide if cinematic desired. Keeping for now. */}
             <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
                 <button 
                     onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
