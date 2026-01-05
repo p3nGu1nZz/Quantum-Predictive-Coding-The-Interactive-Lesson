@@ -10,11 +10,16 @@ export const Step11: LessonStep = {
     title: "11. Hamiltonian Dynamics",
     content: null,
     subsections: [
-        { at: 0, title: "Energy Budget", content: <p>Total Energy = Kinetic + Potential. The system must pay for every movement.</p> },
-        { at: 50, title: "Deep Dive", content: <div className="space-y-4">
-            <p>The system is governed by a <strong>Hamiltonian Operator</strong> <InlineMath math="H" /> (Eq 5), representing total system energy:</p>
-            <MathBlock title="Hamiltonian">{'H = \\underbrace{\\sum \\frac{p_i^2}{2m}}_{Kinetic} + \\underbrace{\\sum V_{ij}}_{Potential}'}</MathBlock>
-            <p>This enforces <strong>Conservation of Energy</strong>. High potential energy (Confusion/Error) is converted into Kinetic Energy (Exploration). This momentum allows the system to crash through barriers and escape local minima—using the energy of its own confusion to find the solution. It's not just optimization; it's ballistics.</p>
+        { at: 0, title: "The Supreme Ruler", content: <p>If there is a supreme ruler in this simulation, a god of the machine, it is the <strong>Hamiltonian</strong>.</p> },
+        { at: 25, title: "Energy Budget", content: <div className="space-y-4">
+            <p>In physics, the Hamiltonian represents the Total Energy of a system—the sum of its Kinetic Energy (the energy of motion) and its Potential Energy (the energy of position and structure). This single quantity rules everything you see on the screen.</p>
+            <MathBlock title="Hamiltonian">{'H = \\sum \\frac{p_i^2}{2m} + \\sum V_{ij}'}</MathBlock>
+        </div>},
+        { at: 50, title: "Conservation", content: <div className="space-y-4">
+             <p>Because we follow Hamiltonian dynamics, the system cannot just spiral out of control; it has a budget. It trades energy back and forth between motion and error. When the system is confused, it has high Potential Energy.</p>
+        </div>},
+        { at: 75, title: "Kinetic Conversion", content: <div className="space-y-4">
+             <p>As it tries to solve the problem, that potential energy is converted into Kinetic Energy—the particles speed up, they fly around, they explore. Then, as they settle into the solution, that motion is dissipated. The computation ends when the physics settles.</p>
         </div>}
     ],
     config: p({ damping: 0.99 }), setup: 'attractor', symbols: [],

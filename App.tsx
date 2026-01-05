@@ -73,6 +73,7 @@ export default function App() {
   const [cacheVersion, setCacheVersion] = useState(0); 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [isFinished, setIsFinished] = useState(false);
   
   const [stepIndex, setStepIndex] = useState(0);
   const [particles, setParticles] = useState<Particle[]>(createParticles('grid'));
@@ -104,14 +105,12 @@ export default function App() {
     setCameraMode('auto'); 
     setManualZoom(1);
     setManualPan({ x: 0, y: 0 });
-    // Re-create particles for the new step
     const newParticles = createParticles(currentStep.setup);
     setParticles(newParticles);
     latestParticlesRef.current = newParticles;
     setSelectedParticle(null);
   }, [stepIndex, currentStep]);
 
-  // Determine active subsection based on progress
   useEffect(() => {
       if (currentStep.subsections) {
           let idx = 0;
@@ -323,8 +322,6 @@ export default function App() {
       }
   }, [stepIndex, hasStarted]);
 
-  // Reduced frequency of state updates to avoid re-rendering entire app at 60fps
-  // We only update if we need to track stats, but for now we just keep the ref sync
   const handleUpdate = useCallback((newParticles: Particle[]) => {
      latestParticlesRef.current = newParticles;
      if (selectedParticle) {
@@ -337,6 +334,8 @@ export default function App() {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
           setStepIndex(nextIndex);
+      } else {
+          setIsFinished(true);
       }
   };
 
@@ -356,6 +355,19 @@ export default function App() {
             onToggleSound={() => setSoundEnabled(prev => !prev)}
         />
     );
+  }
+
+  if (isFinished) {
+      return (
+          <div className="w-full h-screen bg-black flex items-center justify-center animate-fade-in relative overflow-hidden">
+             <MatrixBackground />
+             <div className="relative z-10 text-center">
+                 <h1 className="text-6xl text-white font-bold mb-4 cyber-font tracking-widest glitch-text">LESSON COMPLETE</h1>
+                 <p className="text-xl text-cyan-400 font-mono mb-8">System Standby. Thank you for participating.</p>
+                 <div className="w-24 h-1 bg-cyan-500 mx-auto shadow-[0_0_20px_#06b6d4]"></div>
+             </div>
+          </div>
+      );
   }
 
   const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
@@ -464,7 +476,7 @@ export default function App() {
                 </div>
                 <button 
                     onClick={attemptNextStep} 
-                    disabled={stepIndex === LESSON_STEPS.length - 1}
+                    disabled={isFinished}
                     className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
                 >
                     <ChevronRight size={24} />

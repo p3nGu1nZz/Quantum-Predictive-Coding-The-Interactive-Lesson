@@ -10,11 +10,14 @@ export const Step28: LessonStep = {
     title: "28. CDMA",
     content: null,
     subsections: [
-        { at: 0, title: "Channels", content: <p>Processing multiple reality streams in the same physical space using Quantum Spin.</p> },
-        { at: 40, title: "Orthogonality", content: <div className="space-y-4">
-            <p>We leverage the orthogonality of spin states to create independent communication channels:</p>
-            <MathBlock>{'\\langle \\psi_{\\uparrow} | \\psi_{\\downarrow} \rangle = 0'}</MathBlock>
-            <p>Particles with opposite spins pass through each other without interaction. This effectively creates <strong>Orthogonal Subspaces</strong> within the same manifold. It is the biological equivalent of <strong>CDMA (Code Division Multiple Access)</strong> used in cellular networks, allowing the brain to process color, motion, and depth simultaneously in the same volume of cortex without crosstalk.</p>
+        { at: 0, title: "Parallel Processing", content: <p>How do you process multiple streams of data in the same chunk of tissue without them becoming a garbled mess? We use <strong>Spin Coupling</strong>.</p> },
+        { at: 30, title: "Invisible Channels", content: <div className="space-y-4">
+            <p>By assigning orthogonal spins to different groups of particles, we create invisible channels. Green particles (Spin Up) interact strongly with other Green particles. Orange particles (Spin Down) interact with other Orange particles.</p>
+            <p>But Green and Orange? They pass right through each other like ghosts. They occupy the same space, but they exist in different realities.</p>
+        </div>},
+        { at: 60, title: "Historical Context", content: <div className="space-y-4">
+            <p>This is <strong>Code Division Multiple Access (CDMA)</strong> for the brain. The concept was famously pioneered by actress and inventor <strong>Hedy Lamarr</strong> during WWII to prevent torpedo jamming. She realized that by hopping frequencies, a signal could hide in plain sight.</p>
+            <p>Our network uses "Spin Hopping" to achieve the same effect: layering parallel realities within a single computing volume.</p>
         </div>}
     ],
     config: p({ spinEnabled: true }), setup: 'spin_cluster', symbols: [],

@@ -11,16 +11,15 @@ export const MatrixBackground: React.FC = () => {
         const gl = canvas.getContext('webgl');
         if (!gl) return;
 
-        // Render at 1/4 resolution for performance and retro aesthetics
+        // Render at 1/2 resolution for crispness but performance
         const setSize = () => {
-            canvas.width = window.innerWidth / 4;
-            canvas.height = window.innerHeight / 4;
+            canvas.width = window.innerWidth / 2;
+            canvas.height = window.innerHeight / 2;
             gl.viewport(0, 0, canvas.width, canvas.height);
         };
         setSize();
         window.addEventListener('resize', setSize);
 
-        // Vertex Shader (Simple Pass-through)
         const vsSource = `
             attribute vec2 position;
             varying vec2 vUv;
@@ -30,7 +29,6 @@ export const MatrixBackground: React.FC = () => {
             }
         `;
 
-        // Fragment Shader (Procedural Digital Rain)
         const fsSource = `
             precision mediump float;
             varying vec2 vUv;
@@ -42,48 +40,57 @@ export const MatrixBackground: React.FC = () => {
             }
 
             void main() {
-                // Grid setup
                 vec2 uv = vUv;
-                float columns = 40.0;
-                float rows = 20.0; // Aspect ratio adjustment handled by resolution
+                // Aspect ratio correction
+                float aspect = uResolution.x / uResolution.y;
                 
-                // Discretize coordinates
+                // Grid for characters
+                float columns = 60.0;
+                float rows = 30.0; 
+                
                 vec2 grid = vec2(floor(uv.x * columns), floor(uv.y * rows));
                 vec2 st = fract(vec2(uv.x * columns, uv.y * rows));
 
-                // Falling speed varies by column
-                float speed = 2.0 + random(vec2(grid.x, 0.0)) * 3.0;
-                float yOffset = uTime * speed;
+                // Speed
+                float speed = 1.0 + random(vec2(grid.x, 0.0)) * 2.0;
+                float t = uTime * speed;
                 
-                // Character changing speed
-                float charChange = floor(uTime * 8.0 + random(grid) * 5.0);
+                // Falling effect
+                float yVal = grid.y / rows;
+                float drop = fract(t + random(vec2(grid.x, 1.0)));
                 
-                // Calculate cell value based on scrolling position
-                float cellVal = floor((uv.y + yOffset * 0.1) * rows);
+                // Trail
+                float trailLen = 0.5 + random(vec2(grid.x, 2.0)) * 0.3;
+                float dist = (drop - uv.y); 
                 
-                // Noise value for "character" shape (abstracted)
-                float noise = random(vec2(grid.x, cellVal + charChange));
+                // Wrap around distance logic
+                if(dist < 0.0) dist += 1.0;
                 
-                // Trail fade
-                float trail = fract((uv.y * 1.5) + uTime * 0.2 + random(vec2(grid.x, 1.0)));
-                trail = pow(trail, 8.0); // Make it sharp
+                float intensity = 0.0;
+                if(dist < trailLen) {
+                    intensity = 1.0 - (dist / trailLen);
+                    intensity = pow(intensity, 3.0);
+                }
 
-                // Digital glyph shape (simple blocky patterns)
-                float glyph = step(0.5, noise);
-                if (st.x < 0.1 || st.x > 0.9 || st.y < 0.1 || st.y > 0.9) glyph = 0.0; // Padding
-
-                // Color mixing
-                vec3 color = vec3(0.0, 0.8, 0.9) * glyph * trail;
+                // Character flicker
+                float charFlicker = step(0.5, random(vec2(grid.x, floor(t * 10.0))));
                 
-                // Header (bright lead character)
-                float head = step(0.98, trail);
-                color += vec3(0.8, 1.0, 1.0) * head * glyph;
-
-                gl_FragColor = vec4(color, 1.0);
+                // Matrix Green Color Palette
+                vec3 color = vec3(0.0, 1.0, 0.2) * intensity;
+                
+                // Bright head
+                if(dist < 0.05) {
+                    color = vec3(0.8, 1.0, 0.9);
+                }
+                
+                // Glyph shape (abstracted)
+                float glyph = step(0.2, random(vec2(grid.x, grid.y + floor(t * 5.0))));
+                if(st.x < 0.1 || st.x > 0.9 || st.y < 0.1 || st.y > 0.9) glyph = 0.0;
+                
+                gl_FragColor = vec4(color * glyph * charFlicker, 1.0);
             }
         `;
 
-        // Compile Shaders
         const createShader = (type: number, source: string) => {
             const shader = gl.createShader(type)!;
             gl.shaderSource(shader, source);
@@ -106,7 +113,6 @@ export const MatrixBackground: React.FC = () => {
         gl.linkProgram(program);
         gl.useProgram(program);
 
-        // Buffer Setup (Full Screen Quad)
         const positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         const positions = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
@@ -139,8 +145,8 @@ export const MatrixBackground: React.FC = () => {
     return (
         <canvas 
             ref={canvasRef} 
-            className="absolute inset-0 w-full h-full pointer-events-none opacity-20 z-0 scale-100 origin-top-left"
-            style={{ width: '100%', height: '100%', imageRendering: 'pixelated' }}
+            className="absolute inset-0 w-full h-full pointer-events-none opacity-40 z-0 bg-black"
+            style={{ width: '100%', height: '100%' }}
         />
     );
 };
