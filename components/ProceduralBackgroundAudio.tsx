@@ -4,28 +4,31 @@ interface ProceduralBackgroundAudioProps {
   isPlaying: boolean;
   isNarrating: boolean; // Signal to duck volume
   volume?: number;
+  mode?: 'title' | 'lesson'; // New prop to control audio intensity/filter
 }
 
 // IndexedDB configuration for Music Cache
 const DB_NAME = 'QuantumPCN_MusicDB';
 const STORE_NAME = 'music_tracks';
-const TRACK_KEY = 'cyberpunk_midtempo_v1';
+const TRACK_KEY = 'cyberpunk_midtempo_v2'; // Bump version to force regen
 
 export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps> = ({ 
   isPlaying, 
   isNarrating, 
-  volume = 0.4 
+  volume = 0.4,
+  mode = 'lesson'
 }) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const filterNodeRef = useRef<BiquadFilterNode | null>(null); // For mode transitions
   const [isReady, setIsReady] = useState(false);
 
   // --- Music Generation Logic ---
   const generateTrack = async (sampleRate: number): Promise<AudioBuffer> => {
     const duration = 60; // 60 seconds loop
     const offlineCtx = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
-    const bpm = 90;
+    const bpm = 80; // Slightly slower for more cinematic feel
     const beatTime = 60 / bpm;
     const totalBeats = Math.floor(duration / beatTime);
 
@@ -54,12 +57,12 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
     bassOsc.frequency.value = 36.71; // D1
     const bassFilter = offlineCtx.createBiquadFilter();
     bassFilter.type = 'lowpass';
-    bassFilter.frequency.value = 150;
+    bassFilter.frequency.value = 120;
     const bassLfo = offlineCtx.createOscillator();
     bassLfo.type = 'sine';
     bassLfo.frequency.value = 0.1; // Slow movement
     const bassLfoGain = offlineCtx.createGain();
-    bassLfoGain.gain.value = 50;
+    bassLfoGain.gain.value = 40;
     
     bassLfo.connect(bassLfoGain).connect(bassFilter.frequency);
     bassOsc.connect(bassFilter).connect(masterGain);
@@ -74,7 +77,7 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
     padGain.gain.value = 0.05;
     const padPan = offlineCtx.createStereoPanner();
     const padLfo = offlineCtx.createOscillator();
-    padLfo.frequency.value = 0.2;
+    padLfo.frequency.value = 0.15;
     padLfo.connect(padPan.pan);
 
     padOsc.connect(padGain).connect(padPan).connect(masterGain);
@@ -82,81 +85,27 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
     padOsc.start(0);
     padLfo.start(0);
 
-    // 3. Kick Drum (Midtempo Heartbeat)
-    const kickGain = offlineCtx.createGain();
-    kickGain.connect(masterGain);
-    
-    for (let i = 0; i < totalBeats; i++) {
-        if (i % 4 === 0 || i % 4 === 2.5) { // Simple pattern
-            const t = i * beatTime;
-            const osc = offlineCtx.createOscillator();
-            osc.frequency.setValueAtTime(150, t);
-            osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
-            
-            const env = offlineCtx.createGain();
-            env.gain.setValueAtTime(1, t);
-            env.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-            
-            osc.connect(env).connect(kickGain);
-            osc.start(t);
-            osc.stop(t + 0.5);
-        }
-    }
-
-    // 4. Hi-Hats / Clicks (Cyberpunk Texture)
-    const noiseBuffer = offlineCtx.createBuffer(1, sampleRate * 0.1, sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-
-    const hatGain = offlineCtx.createGain();
-    hatGain.gain.value = 0.05;
-    hatGain.connect(masterGain);
-
-    for (let i = 0; i < totalBeats * 4; i++) { // 16th notes
-        if (i % 4 !== 0) { // Skip beat
-            const t = i * (beatTime / 4);
-            const src = offlineCtx.createBufferSource();
-            src.buffer = noiseBuffer;
-            
-            const filter = offlineCtx.createBiquadFilter();
-            filter.type = 'highpass';
-            filter.frequency.value = 8000;
-            
-            const env = offlineCtx.createGain();
-            env.gain.setValueAtTime(0.3, t);
-            env.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
-
-            src.connect(filter).connect(env).connect(hatGain);
-            src.start(t);
-        }
-    }
-
-    // 5. Arpeggio (Tech feel)
+    // 3. Arpeggio (Tech feel)
     const arpGain = offlineCtx.createGain();
     arpGain.gain.value = 0.03;
     arpGain.connect(delay); // Heavy delay
 
-    const notes = [293.66, 349.23, 440.00, 523.25]; // D Minor 7
-    for (let i = 0; i < totalBeats * 2; i++) {
-        if (Math.random() > 0.4) {
-            const t = i * (beatTime / 2);
+    const notes = [293.66, 349.23, 440.00, 523.25, 293.66, 440.00, 349.23, 261.63]; // D Minor extended
+    for (let i = 0; i < totalBeats * 4; i++) { // 16th notes
+        if (Math.random() > 0.6) {
+            const t = i * (beatTime / 4);
             const osc = offlineCtx.createOscillator();
-            osc.type = 'square';
-            osc.frequency.value = notes[i % 4];
+            osc.type = 'sine';
+            osc.frequency.value = notes[i % 8];
             
-            const filter = offlineCtx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(500, t);
-            filter.frequency.linearRampToValueAtTime(2000, t + 0.1);
-
             const env = offlineCtx.createGain();
             env.gain.setValueAtTime(0, t);
-            env.gain.linearRampToValueAtTime(0.5, t + 0.01);
-            env.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+            env.gain.linearRampToValueAtTime(0.4, t + 0.01);
+            env.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
 
-            osc.connect(filter).connect(env).connect(arpGain);
+            osc.connect(env).connect(arpGain);
             osc.start(t);
-            osc.stop(t + 0.3);
+            osc.stop(t + 0.25);
         }
     }
 
@@ -171,8 +120,10 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
           const req = store.get(TRACK_KEY);
           req.onsuccess = () => {
               if (req.result && audioContextRef.current) {
-                  // Decode stored array buffer
-                  audioContextRef.current.decodeAudioData(req.result).then(resolve).catch(() => resolve(null));
+                  // If we stored raw data, decode is needed, but we stored structure.
+                  // Simpler: Just regen if complex storage is hard. 
+                  // For this demo, let's regen to be safe and consistent without complex serialization.
+                  resolve(null); 
               } else {
                   resolve(null);
               }
@@ -181,94 +132,62 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
       });
   };
 
-  const saveTrackToCache = (db: IDBDatabase, buffer: AudioBuffer) => {
-      // We need to convert AudioBuffer back to ArrayBuffer/WAV to store, 
-      // OR mostly simply store the channel data, but AudioBuffer isn't directly serializable in all browsers.
-      // Easiest is to encode to WAV or just rely on raw PCM floats if space permits.
-      // For simplicity here, we re-render as WAV blob or just store the raw buffer if supported.
-      // Actually, standard AudioContext.decodeAudioData takes an ArrayBuffer. 
-      // To cache, we assume we generated it. 
-      // *Correction*: We can't easily turn AudioBuffer back to ArrayBuffer for decodeAudioData without a wav encoder.
-      // Instead, we will store the raw Float32Arrays.
-      
-      const channels = [];
-      for(let i=0; i<buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
-      
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      store.put({
-          channels,
-          sampleRate: buffer.sampleRate,
-          length: buffer.length
-      }, TRACK_KEY);
-  };
-
-  const loadFromCacheOrGenerate = async (ctx: AudioContext) => {
-      const request = indexedDB.open(DB_NAME, 1);
-      
-      request.onupgradeneeded = (e) => {
-          const db = (e.target as IDBOpenDBRequest).result;
-          if (!db.objectStoreNames.contains(STORE_NAME)) {
-              db.createObjectStore(STORE_NAME);
-          }
-      };
-
-      request.onsuccess = async (e) => {
-          const db = (e.target as IDBOpenDBRequest).result;
-          const tx = db.transaction(STORE_NAME, 'readonly');
-          const store = tx.objectStore(STORE_NAME);
-          const getReq = store.get(TRACK_KEY);
-          
-          getReq.onsuccess = async () => {
-              if (getReq.result) {
-                  // Reconstruct AudioBuffer
-                  const data = getReq.result;
-                  const newBuffer = ctx.createBuffer(data.channels.length, data.length, data.sampleRate);
-                  for(let i=0; i<data.channels.length; i++) {
-                      newBuffer.copyToChannel(data.channels[i], i);
-                  }
-                  startPlayback(ctx, newBuffer);
-              } else {
-                  // Generate
-                  const buffer = await generateTrack(ctx.sampleRate);
-                  // Cache
-                  saveTrackToCache(db, buffer);
-                  startPlayback(ctx, buffer);
-              }
-          };
-          getReq.onerror = async () => {
-              const buffer = await generateTrack(ctx.sampleRate);
-              startPlayback(ctx, buffer);
-          }
-      };
-  };
-
   const startPlayback = (ctx: AudioContext, buffer: AudioBuffer) => {
+      // Create Filter for Title/Lesson Mode Transition
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = mode === 'title' ? 400 : 20000;
+      filter.Q.value = 1;
+      filterNodeRef.current = filter;
+
       const gain = ctx.createGain();
-      gain.connect(ctx.destination);
       gain.gain.value = volume;
       gainNodeRef.current = gain;
+
+      // Chain: Source -> Filter -> Gain -> Destination
+      filter.connect(gain);
+      gain.connect(ctx.destination);
 
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
-      source.connect(gain);
+      source.connect(filter);
       source.start(0);
       sourceNodeRef.current = source;
       setIsReady(true);
   };
 
+  const loadAndPlay = async (ctx: AudioContext) => {
+       const buffer = await generateTrack(ctx.sampleRate);
+       startPlayback(ctx, buffer);
+  };
+
   useEffect(() => {
+    // Initialize Audio Context on first play request
     if (isPlaying && !isReady && !audioContextRef.current) {
         const Ctx = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new Ctx();
         audioContextRef.current = ctx;
-        loadFromCacheOrGenerate(ctx);
+        loadAndPlay(ctx);
     } else if (audioContextRef.current) {
         if (isPlaying) audioContextRef.current.resume();
         else audioContextRef.current.suspend();
     }
   }, [isPlaying, isReady]);
+
+  // Handle Mode Changes (Title vs Lesson)
+  useEffect(() => {
+      if (!filterNodeRef.current || !audioContextRef.current) return;
+      const t = audioContextRef.current.currentTime;
+      const filter = filterNodeRef.current;
+
+      // Smooth transition between muffled and clear
+      if (mode === 'title') {
+          filter.frequency.exponentialRampToValueAtTime(400, t + 2); // Muffle
+      } else {
+          filter.frequency.exponentialRampToValueAtTime(20000, t + 4); // Open up slowly
+      }
+  }, [mode]);
 
   // Documentary Style Mixing (Ducking)
   useEffect(() => {
@@ -277,8 +196,7 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
     const gainNode = gainNodeRef.current;
     
     // Documentary mix: Background music drops significantly when voice is active
-    // Voice usually -10dB to -6dB, Music -20dB to -30dB
-    const target = isNarrating ? volume * 0.15 : volume; 
+    const target = isNarrating ? volume * 0.2 : volume; 
     
     const now = ctx.currentTime;
     gainNode.gain.cancelScheduledValues(now);
@@ -288,6 +206,7 @@ export const ProceduralBackgroundAudio: React.FC<ProceduralBackgroundAudioProps>
 
   useEffect(() => {
       return () => {
+          // Cleanup on unmount (though we moved this to App top level so it shouldn't unmount often)
           if (sourceNodeRef.current) sourceNodeRef.current.stop();
           if (audioContextRef.current) audioContextRef.current.close();
       };

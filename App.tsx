@@ -3,6 +3,7 @@ import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
 import { AudioNarrator } from './components/AudioNarrator'; 
 import { ProceduralBackgroundAudio } from './components/ProceduralBackgroundAudio';
+import { SoundEffects } from './components/SoundEffects';
 import { MatrixBackground } from './components/MatrixBackground'; 
 import { TitleScreen } from './components/TitleScreen';
 import { TransitionScreen } from './components/TransitionScreen';
@@ -93,6 +94,9 @@ export default function App() {
   // Transition State
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<{number: number, title: string} | null>(null);
+  
+  // SFX Trigger State
+  const [lastSfxTrigger, setLastSfxTrigger] = useState<ScriptedEvent | null>(null);
 
   const audioCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -134,6 +138,7 @@ export default function App() {
   }, [currentPlaybackProgress, currentStep.subsections]);
 
   const handleScriptTrigger = useCallback((evt: ScriptedEvent) => {
+      // Logic triggers
       if (evt.type === 'zoom' && evt.targetZoom !== undefined) {
           setManualZoom(evt.targetZoom);
           setCameraMode('manual');
@@ -147,6 +152,12 @@ export default function App() {
           setManualZoom(1);
           setManualPan({ x: 0, y: 0 });
       }
+
+      // SFX triggers
+      if (['pulse', 'shake', 'spawn', 'highlight', 'force'].includes(evt.type)) {
+          setLastSfxTrigger(evt); // Pass to SFX component
+      }
+
   }, []);
 
   async function decodeFileAudioData(data: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> {
@@ -297,8 +308,13 @@ export default function App() {
   const handleTitleAction = async () => {
       if (initStatus === 'idle') {
           setInitStatus('loading');
-          if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
           
+          // Start Audio System if not already
+          if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+          if (audioContextRef.current.state === 'suspended') {
+              audioContextRef.current.resume();
+          }
+
           const progressInterval = setInterval(() => {
               setLoadingProgress(prev => prev >= 95 ? prev : prev + 0.5);
           }, 50);
@@ -381,9 +397,23 @@ export default function App() {
       }
   };
 
-  // Render TitleScreen only if NOT started
-  if (!hasStarted) {
-    return (
+  const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
+
+  return (
+    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
+      
+      {/* GLOBAL AUDIO SYSTEM - MOUNTED AT ROOT */}
+      <ProceduralBackgroundAudio 
+         isPlaying={soundEnabled && (initStatus !== 'idle')} // Starts playing when user clicks Initialize
+         isNarrating={narratorActive} 
+         volume={0.4} 
+         mode={hasStarted ? 'lesson' : 'title'} // Switches filter mode
+      />
+
+      <SoundEffects trigger={lastSfxTrigger} soundEnabled={soundEnabled} />
+
+      {/* RENDER TITLE SCREEN IF NOT STARTED */}
+      {!hasStarted && (
         <TitleScreen 
             initStatus={initStatus} 
             loadingProgress={loadingProgress} 
@@ -391,12 +421,10 @@ export default function App() {
             soundEnabled={soundEnabled}
             onToggleSound={() => setSoundEnabled(prev => !prev)}
         />
-    );
-  }
+      )}
 
-  if (isFinished) {
-      return (
-          <div className="w-full h-screen bg-black flex items-center justify-center animate-fade-in relative overflow-hidden">
+      {isFinished && hasStarted && (
+          <div className="w-full h-screen bg-black flex items-center justify-center animate-fade-in relative overflow-hidden z-[100]">
              <MatrixBackground />
              <div className="relative z-10 text-center">
                  <h1 className="text-6xl text-white font-bold mb-4 cyber-font tracking-widest glitch-text">LESSON COMPLETE</h1>
@@ -404,173 +432,162 @@ export default function App() {
                  <div className="w-24 h-1 bg-cyan-500 mx-auto shadow-[0_0_20px_#06b6d4]"></div>
              </div>
           </div>
-      );
-  }
+      )}
 
-  const activeSubsection = currentStep.subsections ? currentStep.subsections[activeSubsectionIndex] : null;
+      {/* MAIN APP CONTENT - HIDDEN UNTIL STARTED */}
+      {hasStarted && !isFinished && (
+        <>
+            {/* Transition Overlay (z-500) */}
+            <TransitionScreen 
+                isVisible={isTransitioning} 
+                lessonNumber={transitionTarget?.number || 0} 
+                title={transitionTarget?.title || ""} 
+            />
 
-  return (
-    <div className="flex flex-col w-full h-screen bg-black overflow-hidden relative">
-      
-      {/* Background Music System */}
-      <ProceduralBackgroundAudio 
-         isPlaying={soundEnabled} 
-         isNarrating={narratorActive} 
-         volume={0.4} 
-      />
+            <AudioNarrator 
+                text={currentStep.narration || ""} 
+                onAutoNext={attemptNextStep} 
+                audioCache={audioCacheRef.current} 
+                audioContext={audioContextRef.current} 
+                cacheVersion={cacheVersion} 
+                onProgressUpdate={setCurrentPlaybackProgress} 
+                soundEnabled={soundEnabled}
+                playbackSpeed={playbackSpeed}
+                disabled={isTransitioning} 
+                onPlayStateChange={setNarratorActive} // Trigger ducking
+            />
 
-      {/* Transition Overlay (z-500) */}
-      <TransitionScreen 
-         isVisible={isTransitioning} 
-         lessonNumber={transitionTarget?.number || 0} 
-         title={transitionTarget?.title || ""} 
-      />
-
-      <AudioNarrator 
-          text={currentStep.narration || ""} 
-          onAutoNext={attemptNextStep} 
-          audioCache={audioCacheRef.current} 
-          audioContext={audioContextRef.current} 
-          cacheVersion={cacheVersion} 
-          onProgressUpdate={setCurrentPlaybackProgress} 
-          soundEnabled={soundEnabled}
-          playbackSpeed={playbackSpeed}
-          disabled={isTransitioning} 
-          onPlayStateChange={setNarratorActive} // Trigger ducking
-      />
-
-      {/* Main Content Area */}
-      <div className="flex flex-1 w-full relative overflow-hidden">
-          
-          {/* STANDARD LEFT SIDEBAR - HIDDEN DURING INTRO */}
-          {!isIntro && (
-            <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
-                <div className="p-8 pb-4 shrink-0">
-                    <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
-                        <div className="flex items-center gap-2">
-                            <Activity size={16} className="text-cyan-500 animate-pulse" />
-                            <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
-                        </div>
-                        <button 
-                            onClick={() => setSoundEnabled(!soundEnabled)} 
-                            className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
-                            title={soundEnabled ? "Mute Narration" : "Enable Narration"}
-                        >
-                            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                        </button>
-                    </div>
-                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
-                        {currentStep.title}
-                    </h1>
-                    <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
-                </div>
+            {/* Main Content Area */}
+            <div className="flex flex-1 w-full relative overflow-hidden">
                 
-                <div 
-                    className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                >
-                    <style>{`
-                        ::-webkit-scrollbar { display: none; }
-                    `}</style>
-                    <div className="h-full flex flex-col transition-all duration-500">
-                        {activeSubsection ? (
-                            <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
-                                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
-                                    <span>{activeSubsection.title}</span>
-                                    <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
+                {/* STANDARD LEFT SIDEBAR - HIDDEN DURING INTRO */}
+                {!isIntro && (
+                    <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
+                        <div className="p-8 pb-4 shrink-0">
+                            <div className="flex items-center gap-2 mb-2 opacity-50 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Activity size={16} className="text-cyan-500 animate-pulse" />
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode</span>
                                 </div>
-                                <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
-                                    {activeSubsection.content}
-                                </div>
-                                {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+                                <button 
+                                    onClick={() => setSoundEnabled(!soundEnabled)} 
+                                    className={`transition-colors ${soundEnabled ? 'text-cyan-500 hover:text-cyan-400' : 'text-slate-600 hover:text-slate-400'}`}
+                                    title={soundEnabled ? "Mute Narration" : "Enable Narration"}
+                                >
+                                    {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                                </button>
                             </div>
-                        ) : (
-                            <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
-                                {currentStep.content}
-                                <SymbolTable symbols={currentStep.symbols} />
+                            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
+                                {currentStep.title}
+                            </h1>
+                            <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
+                        </div>
+                        
+                        <div 
+                            className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-none"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
+                            <style>{`
+                                ::-webkit-scrollbar { display: none; }
+                            `}</style>
+                            <div className="h-full flex flex-col transition-all duration-500">
+                                {activeSubsection ? (
+                                    <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
+                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 flex justify-between">
+                                            <span>{activeSubsection.title}</span>
+                                            <span className="text-cyan-900">{Math.floor(currentPlaybackProgress)}%</span>
+                                        </div>
+                                        <div className="text-xl md:text-2xl text-slate-300 leading-relaxed font-light font-serif">
+                                            {activeSubsection.content}
+                                        </div>
+                                        {currentStep.symbols && currentStep.symbols.length > 0 && <SymbolTable symbols={currentStep.symbols} />}
+                                    </div>
+                                ) : (
+                                    <div className="text-xl text-slate-300 leading-relaxed font-light font-serif animate-fade-in">
+                                        {currentStep.content}
+                                        <SymbolTable symbols={currentStep.symbols} />
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-          )}
-
-          {/* RIGHT PANEL / FULL SCREEN CANVAS */}
-          <div className={`${isIntro ? 'w-full absolute inset-0 z-0' : 'w-[60%] relative'} h-full bg-black transition-all duration-500`}>
-            <MatrixBackground />
-            
-            <div className="absolute inset-0">
-                <SimulationCanvas 
-                    particles={particles}
-                    config={currentConfig} 
-                    onUpdate={handleUpdate}
-                    onSelectParticle={setSelectedParticle}
-                    isRunning={isRunning && !isTransitioning} // Pause sim during transition
-                    interactionMode="perturb" 
-                    cameraMode={cameraMode}
-                    manualZoom={manualZoom}
-                    manualPan={manualPan}
-                    onPan={setManualPan} 
-                    playbackProgress={currentPlaybackProgress}
-                    script={currentStep.script}
-                    onScriptTrigger={handleScriptTrigger}
-                />
-            </div>
-
-            {/* INTRO SCENE OVERLAY */}
-            {isIntro && (
-                <IntroScene 
-                    progress={currentPlaybackProgress} 
-                    subsections={currentStep.subsections}
-                />
-            )}
-
-            <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
-                <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex}</div>
-                <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
-            </div>
-
-            {/* Manual Controls - Visible when sound is disabled or just always available for manual override */}
-            {/* HIDE CONTROLS DURING INTRO UNLESS NEEDED (Let it play out or keep manual override?) */}
-            {/* Keeping manual override even in intro is good for debugging but maybe hide if cinematic desired. Keeping for now. */}
-            <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
-                <button 
-                    onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
-                    className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
-                    title="Toggle Speed 1x/4x"
-                >
-                    <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
-                </button>
-                <button 
-                    onClick={handlePrevStep} 
-                    disabled={stepIndex === 0}
-                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                {!soundEnabled && (
-                    <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
-                        Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
+                        </div>
                     </div>
                 )}
-                <button 
-                    onClick={attemptNextStep} 
-                    disabled={isFinished}
-                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-                >
-                    <ChevronRight size={24} />
-                </button>
-            </div>
-          </div>
-      </div>
 
-      {/* Progress Bar Spanning Full Width at Bottom */}
-      <div className="h-2 bg-slate-900 w-full relative shrink-0 z-50">
-         <div 
-             className="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-200 ease-linear"
-             style={{ width: `${currentPlaybackProgress}%` }}
-         ></div>
-      </div>
+                {/* RIGHT PANEL / FULL SCREEN CANVAS */}
+                <div className={`${isIntro ? 'w-full absolute inset-0 z-0' : 'w-[60%] relative'} h-full bg-black transition-all duration-500`}>
+                    <MatrixBackground />
+                    
+                    <div className="absolute inset-0">
+                        <SimulationCanvas 
+                            particles={particles}
+                            config={currentConfig} 
+                            onUpdate={handleUpdate}
+                            onSelectParticle={setSelectedParticle}
+                            isRunning={isRunning && !isTransitioning} // Pause sim during transition
+                            interactionMode="perturb" 
+                            cameraMode={cameraMode}
+                            manualZoom={manualZoom}
+                            manualPan={manualPan}
+                            onPan={setManualPan} 
+                            playbackProgress={currentPlaybackProgress}
+                            script={currentStep.script}
+                            onScriptTrigger={handleScriptTrigger}
+                        />
+                    </div>
+
+                    {/* INTRO SCENE OVERLAY */}
+                    {isIntro && (
+                        <IntroScene 
+                            progress={currentPlaybackProgress} 
+                            subsections={currentStep.subsections}
+                        />
+                    )}
+
+                    <div className="absolute top-6 right-6 flex flex-col items-end gap-1 pointer-events-none">
+                        <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex}</div>
+                        <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
+                    </div>
+
+                    <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
+                        <button 
+                            onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                            className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                            title="Toggle Speed 1x/4x"
+                        >
+                            <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                        </button>
+                        <button 
+                            onClick={handlePrevStep} 
+                            disabled={stepIndex === 0}
+                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                        >
+                            <ChevronLeft size={24} />
+                        </button>
+                        {!soundEnabled && (
+                            <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
+                                Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
+                            </div>
+                        )}
+                        <button 
+                            onClick={attemptNextStep} 
+                            disabled={isFinished}
+                            className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                        >
+                            <ChevronRight size={24} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Progress Bar Spanning Full Width at Bottom */}
+            <div className="h-2 bg-slate-900 w-full relative shrink-0 z-50">
+                <div 
+                    className="h-full bg-cyan-500 shadow-[0_0_15px_#06b6d4] transition-all duration-200 ease-linear"
+                    style={{ width: `${currentPlaybackProgress}%` }}
+                ></div>
+            </div>
+        </>
+      )}
     </div>
   );
 }

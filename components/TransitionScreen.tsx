@@ -15,17 +15,16 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
   const [sysMsg, setSysMsg] = useState("INITIALIZING");
   const [sysIcon, setSysIcon] = useState<React.ReactNode>(<Loader className="animate-spin" size={14} />);
   const frameRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (isVisible) {
-      // Reset state
       setLoadPercent(0);
       setSysMsg("INITIALIZING SEQUENCE");
       setSysIcon(<Loader className="animate-spin" size={14} />);
       
       const timer = setTimeout(() => setShowContent(true), 50);
       
-      // Narrative Sequence (Total window ~4500ms active hold)
       const seq = [
           { t: 500, msg: "SAVING LOCAL STATE", icon: <Database className="animate-pulse" size={14} /> },
           { t: 1500, msg: "FLUSHING MEMORY BUFFERS", icon: <Cpu className="animate-pulse" size={14} /> },
@@ -49,25 +48,66 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
     }
   }, [isVisible, lessonNumber]);
 
-  // Loading Bar Animation - Calibrated for 4.5 Seconds (to finish right before fade out)
   useEffect(() => {
       if (!isVisible) return;
-      
       const updateInterval = 30; 
-      const totalDuration = 4400; // Finish at 4.4s
+      const totalDuration = 4400; 
       const increment = 100 / (totalDuration / updateInterval);
-
       const interval = setInterval(() => {
-          setLoadPercent(prev => {
-              if (prev >= 100) return 100;
-              return prev + increment;
-          });
+          setLoadPercent(prev => (prev >= 100 ? 100 : prev + increment));
       }, updateInterval);
-      
       return () => clearInterval(interval);
   }, [isVisible]);
 
-  // Matrix-style Text Decoder Effect
+  // Particle System
+  useEffect(() => {
+      if (!isVisible || !canvasRef.current) return;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles: {x: number, y: number, z: number, speed: number}[] = [];
+      const particleCount = 200;
+
+      for (let i = 0; i < particleCount; i++) {
+          particles.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              z: Math.random() * 2 + 0.5,
+              speed: Math.random() * 2 + 1
+          });
+      }
+
+      let animId = 0;
+      const render = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#06b6d4'; // Cyan
+          
+          particles.forEach(p => {
+              p.x -= p.speed * (p.z); // Move left
+              if (p.x < 0) {
+                  p.x = canvas.width;
+                  p.y = Math.random() * canvas.height;
+              }
+              
+              const alpha = (p.z / 2.5) * 0.5;
+              ctx.globalAlpha = alpha;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.z, 0, Math.PI * 2);
+              ctx.fill();
+          });
+          
+          animId = requestAnimationFrame(render);
+      };
+      render();
+
+      return () => cancelAnimationFrame(animId);
+  }, [isVisible]);
+
+  // Matrix-style Text Decoder
   useEffect(() => {
     if (!showContent) return;
     
@@ -83,7 +123,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
         setDecodedTitle(result);
         
         if (iteration < title.length) {
-            iteration += 0.5; 
+            iteration += 0.3; // Slower decode speed
             frameRef.current = requestAnimationFrame(animateText);
         }
     };
@@ -98,6 +138,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
       className={`fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center transition-opacity duration-500 pointer-events-none overflow-hidden ${isVisible ? 'opacity-100' : 'opacity-0'}`}
     >
       <MatrixBackground />
+      <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-50" />
       
       {/* Cinematic Scanlines */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[1] bg-[length:100%_2px,3px_100%] pointer-events-none"></div>
@@ -106,7 +147,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
         
         {/* Lesson Number Large */}
         <div 
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[20rem] font-bold text-slate-900/40 cyber-font tracking-tighter transition-all duration-700 transform ${showContent ? 'scale-100 opacity-100' : 'scale-150 opacity-0'}`}
+            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[20rem] font-bold text-slate-900/40 cyber-font tracking-tighter transition-all duration-1000 transform ${showContent ? 'scale-100 opacity-100' : 'scale-125 opacity-0'}`}
         >
             {lessonNumber === 0 ? "INTR" : lessonNumber.toString().padStart(2, '0')}
         </div>
@@ -120,7 +161,7 @@ export const TransitionScreen: React.FC<TransitionScreenProps> = ({ isVisible, l
             </div>
 
             <div className="h-24 flex items-center justify-center">
-                <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-purple-500 cyber-font text-center shadow-cyan-500/50 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+                <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-purple-500 cyber-font text-center shadow-cyan-500/50 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-opacity duration-1000 ease-in-out">
                     {decodedTitle || title}
                 </h1>
             </div>
