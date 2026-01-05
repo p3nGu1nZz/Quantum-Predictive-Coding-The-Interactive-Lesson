@@ -1,14 +1,16 @@
 import React from 'react';
-import { Cpu, Radio, ChevronRight, Zap, Atom } from 'lucide-react';
+import { Cpu, Radio, ChevronRight, Zap, Atom, Volume2, VolumeX } from 'lucide-react';
 import { MatrixBackground } from './MatrixBackground';
 
 interface TitleScreenProps {
   initStatus: 'idle' | 'loading' | 'ready';
   loadingProgress: number;
   onInitialize: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }
 
-export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, onInitialize }) => {
+export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingProgress, onInitialize, soundEnabled, onToggleSound }) => {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden flex flex-col items-center justify-center font-serif select-none z-[100]">
       <MatrixBackground />
@@ -42,12 +44,12 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                 <div className="h-px w-12 bg-gradient-to-l from-transparent to-cyan-500"></div>
             </div>
 
-            <div className="relative z-20 mt-8">
+            <div className="relative z-20 mt-8 flex flex-col items-center gap-4">
                 <button 
                     onClick={onInitialize} 
                     disabled={initStatus === 'loading'}
                     className={`
-                        relative px-12 md:px-16 py-5 font-bold text-lg md:text-xl rounded-sm border transition-all flex items-center gap-4 mx-auto cyber-font uppercase tracking-widest overflow-hidden group/btn
+                        relative px-12 md:px-16 py-5 font-bold text-lg md:text-xl rounded-sm border transition-all flex items-center gap-4 cyber-font uppercase tracking-widest overflow-hidden group/btn
                         ${initStatus === 'idle' ? 'bg-slate-950 hover:bg-cyan-950/30 text-cyan-50 border-cyan-800 hover:border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_50px_rgba(6,182,212,0.5)]' : ''}
                         ${initStatus === 'loading' ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-wait' : ''}
                         ${initStatus === 'ready' ? 'bg-emerald-950/50 border-emerald-400 text-emerald-100 shadow-[0_0_50px_rgba(16,185,129,0.5)] animate-pulse' : ''}
@@ -83,9 +85,19 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({ initStatus, loadingPro
                         )}
                     </div>
                 </button>
+
+                {initStatus === 'idle' && (
+                    <button 
+                        onClick={onToggleSound}
+                        className={`flex items-center gap-2 px-4 py-2 rounded border text-xs uppercase tracking-widest font-mono transition-all ${soundEnabled ? 'border-cyan-900 text-cyan-500 hover:bg-cyan-950/30' : 'border-slate-800 text-slate-600 hover:text-slate-400'}`}
+                    >
+                        {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                        <span>{soundEnabled ? "Sound Enabled" : "Sound Disabled"}</span>
+                    </button>
+                )}
                 
                 {/* Decorative subtext */}
-                <div className="mt-8 text-slate-600 font-mono text-[10px] space-y-1 opacity-60">
+                <div className="mt-4 text-slate-600 font-mono text-[10px] space-y-1 opacity-60">
                         <p>SECURE PROTOCOL v3.0 // KARA RAWSON & AIMEE CHRZANOWSKI</p>
                         <p className="tracking-widest">QUANTUM FIELD SIMULATION ENGINE</p>
                 </div>

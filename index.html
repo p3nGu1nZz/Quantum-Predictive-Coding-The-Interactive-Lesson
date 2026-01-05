@@ -48,6 +48,14 @@
       .neon-border {
         box-shadow: 0 0 5px rgba(34, 211, 238, 0.5);
       }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
     </style>
   <script type="importmap">
 {

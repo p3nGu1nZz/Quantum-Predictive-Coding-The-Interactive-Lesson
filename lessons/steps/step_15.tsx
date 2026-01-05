@@ -11,10 +11,17 @@ export const Step15: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Minimizing Surprise", content: <p>The biological imperative is to align internal models with external reality. To exist is to predict.</p> },
-        { at: 40, title: "Thermodynamics of Mind", content: <div className="space-y-4">
-            <p>Karl Friston's <strong>Free Energy Principle</strong> posits that all self-organizing systems minimize a bound on surprise (entropy). We translate this into a potential energy function:</p>
+        { at: 30, title: "The Principle", content: <div className="space-y-4">
+             <p>Karl Friston's <strong>Free Energy Principle</strong> posits that all self-organizing systems minimize a bound on surprise (entropy).</p>
+             <p>Living things want to stay alive, and to stay alive, you need to be able to predict your environment.</p>
+        </div>},
+        { at: 60, title: "The Equation", content: <div className="space-y-4">
+             <p>We translate this into a potential energy function:</p>
             <MathBlock>{'F = \\underbrace{-\\ln p(\\mathbf{y} | m)}_{Accuracy} + \\underbrace{D_{KL}[q(\\psi) || p(\\psi)]}_{Complexity}'}</MathBlock>
-            <p>In our simulation, <InlineMath math="F \\propto \\text{Potential Energy}" />. The system is not merely "calculating" probabilities; it is physically flowing down a thermodynamic gradient towards the state of maximum likelihood. It consumes energy to create order.</p>
+        </div>},
+        { at: 80, title: "Thermodynamics", content: <div className="space-y-4">
+             <p>In our simulation, <InlineMath math="F \\propto \\text{Potential Energy}" />.</p>
+             <p>The system is not merely "calculating" probabilities; it is physically flowing down a thermodynamic gradient towards the state of maximum likelihood. It consumes energy to create order.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'error_landscape', symbols: [],

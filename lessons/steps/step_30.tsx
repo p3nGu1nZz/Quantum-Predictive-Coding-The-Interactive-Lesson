@@ -12,7 +12,7 @@ export const Step30: LessonStep = {
     subsections: [
         { at: 0, title: "Stiffness", content: <p>Instant communication across the solid.</p> },
         { at: 40, title: "Phonons", content: <div className="space-y-4">
-            <p>Diffusion is slow. Elasticity is fast. Because the potential field <span className="font-math">{'V_{ij}'}</span> creates a stiff lattice, perturbations travel as <strong>Phonons</strong> (sound waves) at the speed of sound in the medium, rather than the speed of diffusion.</p>
+            <p>Diffusion is slow. Elasticity is fast. Because the potential field <InlineMath math="V_{ij}" /> creates a stiff lattice, perturbations travel as <strong>Phonons</strong> (sound waves) at the speed of sound in the medium, rather than the speed of diffusion.</p>
             <MathBlock>{'v_{sound} = \\sqrt{\\frac{K}{\\rho}}'}</MathBlock>
             <p>This <strong>Nonlocal Elasticity</strong> allows the edge of the network to signal the core almost instantly, creating a "Hive Mind" response that defies the latency limits of chemical signaling.</p>
         </div>}

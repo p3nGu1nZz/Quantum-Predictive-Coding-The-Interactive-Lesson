@@ -9,15 +9,21 @@ export const Step32: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "System Online", content: <p className="text-xl text-center font-bold">The unification of physics and thought.</p> },
-        { at: 50, title: "Deep Dive", content: <div className="space-y-4">
-            <p>We have successfully dismantled the static architecture of classical AI and replaced it with dynamic physics. This framework unifies distinct fields into a single, coherent mathematical object:</p>
+        { at: 30, title: "Unification", content: <div className="space-y-4">
+            <p>We have successfully dismantled the static architecture of classical AI and replaced it with dynamic physics.</p>
+            <p>This framework unifies distinct fields into a single, coherent mathematical object.</p>
+        </div>},
+        { at: 60, title: "Mapping", content: <div className="space-y-4">
             <ul className="list-disc pl-5 space-y-1">
                 <li><strong>Neurons</strong> become <strong>Particles</strong> (Matter).</li>
                 <li><strong>Weights</strong> become <strong>Potentials</strong> (Fields).</li>
                 <li><strong>Loss Functions</strong> become <strong>Thermodynamics</strong> (Free Energy).</li>
                 <li><strong>Wiring</strong> becomes <strong>Vibration</strong> (Resonance).</li>
             </ul>
-            <p>By validating that vibrational coupling and free energy minimization are sufficient to drive self-organized learning, we open the door to <strong>Biomimetic Computing</strong>. We move from a computation that is brittle, fixed, and designed, to one that is fluid, adaptive, and grown—a true Liquid Mind.</p>
+        </div>},
+        { at: 85, title: "Biomimetic Computing", content: <div className="space-y-4">
+            <p>By validating that vibrational coupling and free energy minimization are sufficient to drive self-organized learning, we open the door to <strong>Biomimetic Computing</strong>.</p>
+            <p>We move from a computation that is brittle, fixed, and designed, to one that is fluid, adaptive, and grown—a true Liquid Mind.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'grid', symbols: [],
@@ -27,5 +33,5 @@ export const Step32: LessonStep = {
         { at: 60, type: 'pulse', targetId: 'all', label: "System Active" }, 
         { at: 85, type: 'annotate', label: "Liquid Mind Online" } 
     ],
-    narration: "We have reached the conclusion of our journey. We have dismantled the rigid, frozen castles of classical AI—the matrices, the layers, the static weights—and we have replaced them with the liquid, breathing dynamics of the L-Group. We have replaced Neurons with Particles. We have replaced Weights with Fields. We have replaced Loss Functions with Thermodynamics. And we have replaced Wiring with Vibration. We have validated the framework proposed in the paper: using vibrational coupling and free energy minimization to drive self-organized learning. The rigid structure has melted into a liquid mind. The system is now online. Thank you for your attention."
+    narration: "We have taken the rigid, frozen city of classical AI and melted it down. We have replaced static neurons with dancing particles. We have replaced fixed weights with flowing fields. We have replaced error functions with thermodynamic laws. By unifying the physics of the harmonic oscillator with the calculus of Bayesian inference, we have built a Liquid Mind. A system that doesn't just process data, but physically experiences it as a force. This framework suggests that intelligence is not a trick of code, but a fundamental property of matter organizing itself to minimize surprise. The simulation you see is not just a model; it is a proof of concept for a new kind of computer—one that is grown, not built. One that flows. The system is now online. Welcome to the future of thought."
 };

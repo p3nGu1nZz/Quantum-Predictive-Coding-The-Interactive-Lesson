@@ -1,6 +1,7 @@
 import React from 'react';
 import { PHYSICS } from '../../constants';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -9,10 +10,16 @@ export const Step16: LessonStep = {
     content: null,
     subsections: [
         { at: 0, title: "Growth", content: <p>Classical AI has fixed architecture. Our system has <strong>Living Architecture</strong>. The hardware evolves in real-time to fit the software requirements.</p> },
-        { at: 40, title: "Structural Plasticity", content: <div className="space-y-4">
-            <p>We employ a dynamic equilibrium parameter <span className="font-math">r_0(t)</span> that responds to the local stress tensor (Error Density):</p>
+        { at: 30, title: "Equilibrium", content: <div className="space-y-4">
+            <p>We employ a dynamic equilibrium parameter <InlineMath math="r_0(t)" /> that responds to the local stress tensor (Error Density).</p>
+            <p>The system can dynamically adjust this parameter based on local stress, pulling nodes closer or pushing them apart.</p>
+        </div>},
+        { at: 60, title: "Stress", content: <div className="space-y-4">
             <p className="text-center font-mono bg-slate-800 p-2 rounded border border-slate-700">Stress <span className="text-cyan-400">∝</span> Prediction Error</p>
-            <p>High local error triggers <strong>contraction</strong> (densification), creating high-bandwidth processing hubs. Low error triggers <strong>relaxation</strong> (rarefaction). This mimics biological morphogenesis, where bioelectric fields guide the physical growth of the embryo. The computer builds itself.</p>
+            <p>High local error triggers <strong>contraction</strong> (densification), creating high-bandwidth processing hubs. Low error triggers <strong>relaxation</strong> (rarefaction).</p>
+        </div>},
+        { at: 80, title: "Bio-Patterning", content: <div className="space-y-4">
+             <p>This mimics biological morphogenesis, where bioelectric fields guide the physical growth of the embryo. The computer builds itself.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'morphogenesis', symbols: [],

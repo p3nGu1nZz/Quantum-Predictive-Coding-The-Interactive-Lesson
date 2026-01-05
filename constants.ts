@@ -18,10 +18,10 @@ export const COLORS = {
 
 export const PHYSICS: SimulationConfig = {
   k: 0.08,
-  r0: 60,
+  r0: 150, // Significantly increased from 90 to 150
   eta: 0.02,
   eta_r: 0.05,
-  sigma: 120,
+  sigma: 300, // Significantly increased from 160 to 300
   damping: 0.85, 
   couplingEnabled: true,
   phaseEnabled: false,

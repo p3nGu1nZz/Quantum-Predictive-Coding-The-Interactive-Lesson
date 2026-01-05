@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -13,7 +14,7 @@ export const Step27: LessonStep = {
         { at: 40, title: "Manifold Constraints", content: <div className="space-y-4">
             <p>To prevent the swarm from dissipating into the void (increasing entropy), we apply a <strong>Global Constraint</strong>. This acts like a Lagrange Multiplier enforcing the integrity of the manifold.</p>
             <MathBlock>{'\\mathbf{F}_{corr} = -k_{global} (\\mathbf{r}_i - \\mathbf{r}_{cm})'}</MathBlock>
-            <p>This "gravity" pulls outliers back to the center of mass (<span className="font-math">{'\\mathbf{r}_{cm}'}</span>). In cognitive terms, this is the <strong>Self</strong> exerting coherence over its parts, ensuring that diverse thoughts remain bound to a single unified consciousness.</p>
+            <p>This "gravity" pulls outliers back to the center of mass (<InlineMath math="\mathbf{r}_{cm}" />). In cognitive terms, this is the <strong>Self</strong> exerting coherence over its parts, ensuring that diverse thoughts remain bound to a single unified consciousness.</p>
         </div>}
     ],
     config: p({ k: 0.1 }), setup: 'cavity', symbols: [],

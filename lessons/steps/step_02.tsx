@@ -11,11 +11,17 @@ export const Step02: LessonStep = {
     content: null,
     subsections: [
       { at: 0, title: "Entropy", content: <p>Intelligence is a rebellion against entropy. Free Energy is 'Surprise'.</p> },
-      { at: 50, title: "Deep Dive", content: <div className="space-y-4">
-          <p>At the core of this simulation lies the <strong>Free Energy Principle</strong>. In information theory, "Free Energy" is an upper bound on surprise (or self-information). To survive, any self-organizing system must minimize this quantity.</p>
+      { at: 30, title: "The Principle", content: <div className="space-y-4">
+          <p>At the core of this simulation lies the <strong>Free Energy Principle</strong>. In information theory, "Free Energy" is an upper bound on surprise (or self-information).</p>
+          <p>To survive, any self-organizing system must minimize this quantity.</p>
+      </div>},
+      { at: 60, title: "The Equation", content: <div className="space-y-4">
           <p>We formally define the free energy functional <InlineMath math="F" /> (Eq 21) as a composite of two competing forces:</p>
           <MathBlock title="Variational Free Energy">{'F = E_{pred} + \\beta E_{pos}'}</MathBlock>
-          <p>Here, <InlineMath math="E_{pred}" /> (Eq 22) represents the <strong>Prediction Error</strong>—the difference between a particle's internal state and the consensus of its neighbors. <InlineMath math="E_{pos}" /> (Eq 23) represents the <strong>Spatial Constraint</strong>—the physical tension of the lattice. By minimizing <InlineMath math="F" />, the system simultaneously solves the inference problem (finding the truth) and the structural problem (maintaining integrity). It is a direct translation of Helmholtz Free Energy from thermodynamics into cognitive science.</p>
+      </div>},
+      { at: 80, title: "Interpretation", content: <div className="space-y-4">
+          <p>Here, <InlineMath math="E_{pred}" /> (Eq 22) represents the <strong>Prediction Error</strong>—the difference between a particle's internal state and the consensus of its neighbors. <InlineMath math="E_{pos}" /> (Eq 23) represents the <strong>Spatial Constraint</strong>.</p>
+          <p>By minimizing <InlineMath math="F" />, the system simultaneously solves the inference problem (finding the truth) and the structural problem (maintaining integrity).</p>
       </div>}
     ],
     config: p({ k: 0.02, damping: 0.95 }), setup: 'error_landscape', symbols: [{symbol:"F", definition:"Free Energy", context:"Surprise"}],

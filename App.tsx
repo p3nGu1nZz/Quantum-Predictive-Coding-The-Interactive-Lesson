@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { SymbolTable } from './components/SymbolTable';
 import { AudioNarrator } from './components/AudioNarrator'; 
@@ -7,8 +7,63 @@ import { TitleScreen } from './components/TitleScreen';
 import { Particle, Interaction, Vector2, LessonStep, ScriptedEvent } from './types';
 import { createParticles } from './lessons/setups';
 import { LESSON_STEPS } from './lessons/content';
-import { Activity } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, FastForward } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+
+// --- IndexedDB Utils ---
+const DB_NAME = 'QuantumPCN_AudioDB';
+const STORE_NAME = 'audio_pcm_cache';
+const DB_VERSION = 2; 
+
+interface CachedAudio {
+    text: string;
+    buffer: ArrayBuffer;
+}
+
+const openDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+    });
+};
+
+const getAudioFromDB = async (key: string): Promise<CachedAudio | undefined> => {
+    try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        return undefined;
+    }
+};
+
+const saveAudioToDB = async (key: string, text: string, data: ArrayBuffer): Promise<void> => {
+    try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const item: CachedAudio = { text, buffer: data };
+            const request = store.put(item, key);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        console.warn("IDB Save Error", e);
+    }
+};
 
 export default function App() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -16,15 +71,17 @@ export default function App() {
   const [loadingProgress, setLoadingProgress] = useState(0);   
   const [currentPlaybackProgress, setCurrentPlaybackProgress] = useState(0); 
   const [cacheVersion, setCacheVersion] = useState(0); 
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   
   const [stepIndex, setStepIndex] = useState(0);
   const [particles, setParticles] = useState<Particle[]>(createParticles('grid'));
   const [isRunning, setIsRunning] = useState(true);
-  const [frame, setFrame] = useState(0);
   const [selectedParticle, setSelectedParticle] = useState<Particle | null>(null);
   
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState<Vector2>({ x: 0, y: 0 });
+  const [cameraMode, setCameraMode] = useState<'auto' | 'manual'>('auto');
+  const [manualZoom, setManualZoom] = useState(1);
+  const [manualPan, setManualPan] = useState<Vector2>({ x: 0, y: 0 });
   
   const [activeSubsectionIndex, setActiveSubsectionIndex] = useState(0); 
 
@@ -33,10 +90,9 @@ export default function App() {
   const fetchingRef = useRef<Set<string>>(new Set());
   const ttsQueue = useRef<Array<() => Promise<void>>>([]);
   const isProcessingQueue = useRef(false);
-  const isQuotaExceeded = useRef(false); // Circuit breaker for API limits
+  const isQuotaExceeded = useRef(false); 
 
   const latestParticlesRef = useRef<Particle[]>(particles);
-  const isUpdatingRef = useRef(false);
   
   const currentStep = LESSON_STEPS[stepIndex] || LESSON_STEPS[0];
   const [currentConfig, setCurrentConfig] = useState(currentStep.config);
@@ -44,13 +100,20 @@ export default function App() {
   useEffect(() => {
     setCurrentConfig(currentStep.config);
     setActiveSubsectionIndex(0); 
-    setCurrentPlaybackProgress(0); // Reset progress on new step
-  }, [stepIndex]);
+    setCurrentPlaybackProgress(0); 
+    setCameraMode('auto'); 
+    setManualZoom(1);
+    setManualPan({ x: 0, y: 0 });
+    // Re-create particles for the new step
+    const newParticles = createParticles(currentStep.setup);
+    setParticles(newParticles);
+    latestParticlesRef.current = newParticles;
+    setSelectedParticle(null);
+  }, [stepIndex, currentStep]);
 
   // Determine active subsection based on progress
   useEffect(() => {
       if (currentStep.subsections) {
-          // Find the last subsection that has 'at' <= currentPlaybackProgress
           let idx = 0;
           for (let i = 0; i < currentStep.subsections.length; i++) {
               if (currentPlaybackProgress >= currentStep.subsections[i].at) {
@@ -61,11 +124,21 @@ export default function App() {
       }
   }, [currentPlaybackProgress, currentStep.subsections]);
 
-  const handleScriptTrigger = (evt: ScriptedEvent) => {
-      if (evt.type === 'zoom' && evt.targetZoom !== undefined) setZoom(evt.targetZoom);
-      if (evt.type === 'pan' && evt.targetPan !== undefined) setPan(evt.targetPan);
-      if (evt.type === 'reset') { setZoom(1); setPan({x:0, y:0}); }
-  };
+  const handleScriptTrigger = useCallback((evt: ScriptedEvent) => {
+      if (evt.type === 'zoom' && evt.targetZoom !== undefined) {
+          setManualZoom(evt.targetZoom);
+          setCameraMode('manual');
+      }
+      if (evt.type === 'pan' && evt.targetPan !== undefined) {
+          setManualPan(evt.targetPan);
+          setCameraMode('manual');
+      }
+      if (evt.type === 'reset') { 
+          setCameraMode('auto'); 
+          setManualZoom(1);
+          setManualPan({ x: 0, y: 0 });
+      }
+  }, []);
 
   async function decodeFileAudioData(data: ArrayBuffer, ctx: AudioContext): Promise<AudioBuffer> {
     return ctx.decodeAudioData(data);
@@ -86,7 +159,7 @@ export default function App() {
 
   const generateSpeech = async (text: string): Promise<ArrayBuffer | null> => {
       if (!process.env.API_KEY) return null;
-      if (isQuotaExceeded.current) return null; // Circuit breaker active
+      if (isQuotaExceeded.current) return null; 
 
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -108,7 +181,6 @@ export default function App() {
           }
       } catch (e: any) { 
           console.error("Gemini TTS Error:", e); 
-          // Check for 429 Resource Exhausted
           if (e.toString().includes('429') || e.toString().includes('quota') || e.toString().includes('RESOURCE_EXHAUSTED')) {
               console.warn("API Quota Exceeded. Disabling further TTS requests for this session.");
               isQuotaExceeded.current = true;
@@ -117,14 +189,42 @@ export default function App() {
       return null;
   };
 
-  // Helper to get audio without queueing (for immediate initialization)
   const loadAudioImmediate = async (step: LessonStep, stepIdx: number): Promise<boolean> => {
+      if (!soundEnabled) return true; 
       if (!step.narration) return true;
-      const narrationKey = step.narration;
+      const textToSpeak = step.narration;
+      const cacheKey = `step_${stepIdx}`; 
+      
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCacheRef.current.has(narrationKey)) return true;
+      
+      if (audioCacheRef.current.has(textToSpeak)) return true;
 
-      // Try local file first
+      // 1. Try IndexedDB 
+      let idbMiss = true;
+      try {
+          const cachedItem = await getAudioFromDB(cacheKey);
+          if (cachedItem && cachedItem.text === textToSpeak) {
+              const buffer = decodePCM(cachedItem.buffer, audioContextRef.current);
+              audioCacheRef.current.set(textToSpeak, buffer); 
+              idbMiss = false;
+              return true;
+          }
+      } catch(e) { }
+
+      // 2. Fallback to API 
+      if (idbMiss && !isQuotaExceeded.current) {
+          const generatedBuffer = await generateSpeech(textToSpeak);
+          if (generatedBuffer) {
+              try {
+                  const buffer = decodePCM(generatedBuffer, audioContextRef.current);
+                  audioCacheRef.current.set(textToSpeak, buffer);
+                  saveAudioToDB(cacheKey, textToSpeak, generatedBuffer);
+                  return true;
+              } catch (e) { console.error(e); }
+          }
+      }
+
+      // 3. Last Resort: Try local file
       try {
           const paddedIndex = (stepIdx + 1).toString().padStart(2, '0');
           const filePath = `audio/step_${paddedIndex}.mp3`; 
@@ -132,22 +232,11 @@ export default function App() {
           if (response.ok) {
               const arrayBuffer = await response.arrayBuffer();
               const buffer = await decodeFileAudioData(arrayBuffer, audioContextRef.current);
-              audioCacheRef.current.set(narrationKey, buffer);
+              audioCacheRef.current.set(textToSpeak, buffer);
               return true;
           }
       } catch (e) {}
 
-      // Fallback to API
-      if (!isQuotaExceeded.current) {
-          const generatedBuffer = await generateSpeech(step.narration);
-          if (generatedBuffer) {
-              try {
-                  const buffer = decodePCM(generatedBuffer, audioContextRef.current);
-                  audioCacheRef.current.set(narrationKey, buffer);
-                  return true;
-              } catch (e) { console.error(e); }
-          }
-      }
       return false;
   };
 
@@ -168,18 +257,29 @@ export default function App() {
   };
 
   const fetchAudioForStep = async (step: LessonStep, stepIdx: number): Promise<void> => {
+      if (!soundEnabled) return;
       if (!step.narration) return;
-      if (isQuotaExceeded.current) return; // Don't queue if quota exceeded
+      const textToSpeak = step.narration;
+      
+      const cacheKey = `step_${stepIdx}`;
+      if (isQuotaExceeded.current) {
+          const cached = await getAudioFromDB(cacheKey);
+          if (cached && cached.text === textToSpeak) {
+               if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+               const buffer = decodePCM(cached.buffer, audioContextRef.current);
+               audioCacheRef.current.set(textToSpeak, buffer);
+               return;
+          }
+      }
 
-      const narrationKey = step.narration;
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      if (audioCacheRef.current.has(narrationKey) || fetchingRef.current.has(narrationKey)) return; 
-      fetchingRef.current.add(narrationKey);
+      if (audioCacheRef.current.has(textToSpeak) || fetchingRef.current.has(textToSpeak)) return; 
+      fetchingRef.current.add(textToSpeak);
 
       enqueueTask(async () => {
          await loadAudioImmediate(step, stepIdx);
          setCacheVersion(v => v + 1);
-         fetchingRef.current.delete(narrationKey);
+         fetchingRef.current.delete(textToSpeak);
       });
   };
 
@@ -188,90 +288,61 @@ export default function App() {
           setInitStatus('loading');
           if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
           
-          // Start fake progress simulation (Target 95% over 60 seconds)
-          const startTime = Date.now();
           const progressInterval = setInterval(() => {
-              setLoadingProgress(prev => {
-                  if (prev >= 95) return prev;
-                  // Faster progress for UX
-                  return prev + 0.5; 
-              });
+              setLoadingProgress(prev => prev >= 95 ? prev : prev + 0.5);
           }, 50);
           
           try {
-              // Actual loading logic
-              // Force load Step 1 immediately
               await loadAudioImmediate(LESSON_STEPS[0], 0);
               setCacheVersion(v => v + 1);
-
-              // Start loading Step 2 in background if possible
-              if (!isQuotaExceeded.current) {
-                  loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
-              }
+              loadAudioImmediate(LESSON_STEPS[1], 1).then(() => setCacheVersion(v => v + 1));
           } catch (e) {
               console.error("Audio Load Error:", e);
           } finally {
-              // Done
               clearInterval(progressInterval);
               setLoadingProgress(100);
               setInitStatus('ready');
-              // Wait for user to click "Enter Matrix"
           }
       } else if (initStatus === 'ready') {
-          // Play immediately
           if (audioContextRef.current?.state === 'suspended') {
               audioContextRef.current.resume();
           }
           setHasStarted(true);
-          // Only fetch next few steps, not all
-          // Removed processBackgroundAudio loop to save quota
       }
   };
 
   useEffect(() => {
       if (!hasStarted) return;
       
-      // Load Current Step
       const current = LESSON_STEPS[stepIndex];
       fetchAudioForStep(current, stepIndex);
       
-      // Preload NEXT Step only (Just-In-Time loading to save quota)
       const nextStep = LESSON_STEPS[stepIndex + 1];
       if (nextStep) {
           fetchAudioForStep(nextStep, stepIndex + 1);
       }
   }, [stepIndex, hasStarted]);
 
-  useEffect(() => {
-    if (currentStep) {
-        const newParticles = createParticles(currentStep.setup);
-        setParticles(newParticles);
-        latestParticlesRef.current = newParticles; 
-        isUpdatingRef.current = false;
-        setFrame(0);
-        setIsRunning(true);
-        setSelectedParticle(null);
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-    }
-  }, [stepIndex, currentStep?.setup]);
-
-  const handleUpdate = (newParticles: Particle[], interactions: Interaction[], energy: { pred: number, pos: number, historyError?: number }) => {
-    if (!isUpdatingRef.current || newParticles.length === particles.length) {
-        latestParticlesRef.current = newParticles;
-        if (newParticles.length === particles.length) isUpdatingRef.current = false;
-    }
-    setFrame(f => f + 1);
-    if (selectedParticle) {
-        const updated = newParticles.find(p => p.id === selectedParticle.id);
-        if (updated) setSelectedParticle(updated);
-    }
-  };
+  // Reduced frequency of state updates to avoid re-rendering entire app at 60fps
+  // We only update if we need to track stats, but for now we just keep the ref sync
+  const handleUpdate = useCallback((newParticles: Particle[]) => {
+     latestParticlesRef.current = newParticles;
+     if (selectedParticle) {
+        const p = newParticles.find(p => p.id === selectedParticle.id);
+        if (p) setSelectedParticle(p);
+     }
+  }, [selectedParticle]);
 
   const attemptNextStep = () => {
       const nextIndex = stepIndex + 1;
       if (nextIndex < LESSON_STEPS.length) {
           setStepIndex(nextIndex);
+      }
+  };
+
+  const handlePrevStep = () => {
+      if (stepIndex > 0) {
+          setStepIndex(prev => prev - 1);
       }
   };
 
@@ -281,6 +352,8 @@ export default function App() {
             initStatus={initStatus} 
             loadingProgress={loadingProgress} 
             onInitialize={handleTitleAction} 
+            soundEnabled={soundEnabled}
+            onToggleSound={() => setSoundEnabled(prev => !prev)}
         />
     );
   }
@@ -296,13 +369,15 @@ export default function App() {
           audioContext={audioContextRef.current} 
           cacheVersion={cacheVersion} 
           onProgressUpdate={setCurrentPlaybackProgress} 
+          soundEnabled={soundEnabled}
+          playbackSpeed={playbackSpeed}
       />
 
       <div className="w-[40%] h-full flex flex-col border-r border-slate-800 bg-[#080808] z-20 shadow-[10px_0_50px_rgba(0,0,0,0.5)] relative">
          <div className="p-8 pb-4">
              <div className="flex items-center gap-2 mb-2 opacity-50">
                  <Activity size={16} className="text-cyan-500 animate-pulse" />
-                 <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode // Auto-Seq</span>
+                 <span className="text-[10px] uppercase tracking-[0.3em] font-mono text-cyan-500">Presentation Mode // {soundEnabled ? "Auto-Seq" : "Manual"}</span>
              </div>
              <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 cyber-font mb-2 leading-tight">
                  {currentStep.title}
@@ -310,7 +385,9 @@ export default function App() {
              <div className="h-1 w-20 bg-cyan-500 mt-4 mb-6 shadow-[0_0_10px_#06b6d4]"></div>
          </div>
          
-         <div className="flex-1 overflow-hidden relative px-8 pb-8">
+         <div 
+            className="flex-1 overflow-y-auto relative px-8 pb-8 scrollbar-hide"
+         >
              <div className="h-full flex flex-col transition-all duration-500">
                 {activeSubsection ? (
                     <div className="flex-1 flex flex-col animate-fade-in" key={activeSubsection.title}>
@@ -351,9 +428,10 @@ export default function App() {
                 onSelectParticle={setSelectedParticle}
                 isRunning={isRunning}
                 interactionMode="perturb" 
-                zoom={zoom}
-                pan={pan}
-                onPan={setPan}
+                cameraMode={cameraMode}
+                manualZoom={manualZoom}
+                manualPan={manualPan}
+                onPan={setManualPan} 
                 playbackProgress={currentPlaybackProgress}
                 script={currentStep.script}
                 onScriptTrigger={handleScriptTrigger}
@@ -364,6 +442,35 @@ export default function App() {
             <div className="text-6xl font-bold text-slate-800/50 cyber-font">{stepIndex + 1}</div>
             <div className="text-xs font-mono text-cyan-900/80 tracking-widest uppercase">Lesson Sequence</div>
         </div>
+
+        {!soundEnabled && (
+            <div className="absolute bottom-8 right-8 flex items-center gap-4 z-50">
+                <button 
+                    onClick={() => setPlaybackSpeed(s => s === 1 ? 4 : 1)}
+                    className={`p-3 rounded-full border border-slate-700 bg-slate-900/80 hover:bg-cyan-900/30 hover:border-cyan-500 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm ${playbackSpeed > 1 ? 'text-yellow-400 border-yellow-500' : 'text-cyan-400'}`}
+                    title="Toggle Speed 1x/4x"
+                >
+                    <FastForward size={24} className={playbackSpeed > 1 ? "animate-pulse" : ""} />
+                </button>
+                <button 
+                    onClick={handlePrevStep} 
+                    disabled={stepIndex === 0}
+                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+                <div className="px-4 py-2 bg-black/60 border border-slate-800 rounded font-mono text-xs text-slate-400 uppercase tracking-widest">
+                    Manual {playbackSpeed > 1 ? `(${playbackSpeed}x)` : ''}
+                </div>
+                <button 
+                    onClick={attemptNextStep} 
+                    disabled={stepIndex === LESSON_STEPS.length - 1}
+                    className="p-3 rounded-full border border-slate-700 bg-slate-900/80 text-cyan-400 hover:bg-cyan-900/30 hover:border-cyan-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+                >
+                    <ChevronRight size={24} />
+                </button>
+            </div>
+        )}
       </div>
     </div>
   );

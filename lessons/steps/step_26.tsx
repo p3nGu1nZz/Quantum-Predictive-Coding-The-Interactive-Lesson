@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -11,7 +12,7 @@ export const Step26: LessonStep = {
     subsections: [
         { at: 0, title: "Edge of Chaos", content: <p>Balancing conformity and innovation.</p> },
         { at: 40, title: "Phase Transitions", content: <div className="space-y-4">
-            <p>The system balances two error terms: <span className="font-math">{'E_{local}'}</span> (Peer Pressure) and <span className="font-math">{'E_{global}'}</span> (Top-Down Mandate).</p>
+            <p>The system balances two error terms: <InlineMath math="E_{local}" /> (Peer Pressure) and <InlineMath math="E_{global}" /> (Top-Down Mandate).</p>
             <MathBlock>{'E_{total} = (1-\\lambda)E_{local} + \\lambda E_{global}'}</MathBlock>
             <p>When these forces are balanced, the system sits at a <strong>Critical Point</strong> (a phase transition). Here, correlation length becomes infinite, meaning a small perturbation can cascade through the entire system. This state—the "Edge of Chaos"—is mathematically optimal for computation and adaptation.</p>
         </div>}

@@ -2,6 +2,7 @@ import React from 'react';
 import { PHYSICS } from '../../constants';
 import { MathBlock } from '../../components/MathBlock';
 import { LessonStep } from '../../types';
+import { InlineMath } from '../../components/InlineMath';
 
 const p = (overrides: any = {}) => ({ ...PHYSICS, ...overrides });
 
@@ -11,7 +12,7 @@ export const Step22: LessonStep = {
     subsections: [
         { at: 0, title: "Symmetry", content: <p>Object recognition regardless of orientation.</p> },
         { at: 40, title: "Group Equivariance", content: <div className="space-y-4">
-            <p>Our interaction potential depends only on distance <span className="font-math">{'||\\mathbf{r}_i - \\mathbf{r}_j||'}</span>, not absolute coordinates. This makes the system invariant to the <strong>Special Orthogonal Group SO(3)</strong> (rotations).</p>
+            <p>Our interaction potential depends only on distance <InlineMath math="||\mathbf{r}_i - \mathbf{r}_j||" />, not absolute coordinates. This makes the system invariant to the <strong>Special Orthogonal Group SO(3)</strong> (rotations).</p>
             <MathBlock>{'V(R \\cdot \\mathbf{r}) = V(\\mathbf{r})'}</MathBlock>
             <p>This property, known as <strong>Equivariance</strong>, means that if the input rotates, the entire internal representation rotates with it without distortion. The "meaning" of the pattern is preserved across the transformation group. The system understands the object, not just the pixels.</p>
         </div>}
