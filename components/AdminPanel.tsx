@@ -675,11 +675,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const regenerateVideo = async (clip: VideoClip) => {
-     if (!process.env.API_KEY) { addLog("Missing API Key"); return; }
+     if (!process.env.API_KEY && (!window || !(window as any).aistudio)) { addLog("Missing API Key"); return; }
      setProcessing(prev => new Map(prev).set(`video_${clip.id}`, true));
      addLog(`Generating Video: ${clip.id}...`);
      try {
-         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || 'AIza_dummy_key' });
          if ((window as any).aistudio && (window as any).aistudio.hasSelectedApiKey) {
              const hasKey = await (window as any).aistudio.hasSelectedApiKey();
              if (!hasKey) { await (window as any).aistudio.openSelectKey(); }
@@ -696,7 +696,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
          }
          const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
          if (downloadLink) {
-             const resp = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+             const key = process.env.API_KEY || ((window as any).aistudio ? 'aistudio' : '');
+             const resp = await fetch(`${downloadLink}&key=${key}`);
              const blob = await resp.blob();
              const db = await openDB(VIDEO_DB_NAME, VIDEO_STORE);
              const tx = db.transaction(VIDEO_STORE, 'readwrite');
@@ -706,7 +707,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              addLog(`Video ${clip.id} Cached.`);
              await handleSaveSession(); 
          }
-     } catch (e) { console.error(e); addLog(`Error generating ${clip.id}`); }
+     } catch (e) { console.error(e); addLog(`Error generating ${clip.id}: ${e}`); }
      setProcessing(prev => new Map(prev).set(`video_${clip.id}`, false));
      updateSystemStats();
   };
@@ -863,6 +864,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <div className="flex gap-2">
                                                 {videoUrls.has(clip.id) && <a href={videoUrls.get(clip.id)} download={`${clip.id}.mp4`} className="px-3 py-1 bg-slate-800 text-slate-300 text-[10px] rounded border border-slate-700 hover:bg-slate-700">DOWNLOAD</a>}
                                                 <button onClick={() => triggerUpload('video', clip.id)} className="px-3 py-1 bg-slate-800 text-slate-300 text-[10px] rounded border border-slate-700 hover:bg-slate-700">UPLOAD</button>
+                                                <button onClick={() => regenerateVideo(clip)} disabled={processing.get(`video_${clip.id}`)} className="px-3 py-1 bg-cyan-900/40 text-cyan-400 text-[10px] rounded border border-cyan-700 hover:bg-cyan-900/60 disabled:opacity-50 flex items-center gap-2">{processing.get(`video_${clip.id}`) ? <Loader size={12} className="animate-spin"/> : <RefreshCw size={12}/>} GENERATE</button>
                                             </div>
                                         </div>
                                     </div>

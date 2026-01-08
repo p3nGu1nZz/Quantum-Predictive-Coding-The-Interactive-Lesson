@@ -10,51 +10,64 @@ export const CinematicBackground: React.FC<CinematicBackgroundProps> = ({ videoB
   // We use two video tracks to cross-fade between clips smoothly
   const [tracks, setTracks] = useState<[string | null, string | null]>([null, null]);
   const [activeTrackIndex, setActiveTrackIndex] = useState<0 | 1>(0);
-  const [fading, setFading] = useState(false);
-
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null]);
   
-  // Track the current Blob URL to prevent unnecessary re-renders
-  const lastBlobUrlRef = useRef<string | null>(null);
-
+  // Refs to manage video elements and blob comparison
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([null, null]);
+  const currentBlobRef = useRef<Blob | null>(null);
+  
   useEffect(() => {
+    // 1. Check if the blob has actually changed.
+    // Use strictly equal reference check or size/type check if strictly equal fails (though blobs usually stable if from state)
+    if (videoBlob === currentBlobRef.current) {
+        return; 
+    }
+    
+    // 2. If it's a new blob (or null)
+    currentBlobRef.current = videoBlob;
+
     if (videoBlob) {
         const newUrl = URL.createObjectURL(videoBlob);
         
-        // Don't update if it's the exact same object (though Blob objects change ref, we handle cleanup)
-        // In a real app we might compare IDs, but here we assume new blob = new clip
-        
-        setFading(true);
-        
-        // Update the *inactive* track
+        // Determine which track is currently "inactive" (hidden)
+        // If active is 0, we load into 1. If active is 1, we load into 0.
         const nextIndex = activeTrackIndex === 0 ? 1 : 0;
         
         setTracks(prev => {
             const newTracks = [...prev] as [string | null, string | null];
-            // Revoke old URL to free memory
-            if (newTracks[nextIndex]) URL.revokeObjectURL(newTracks[nextIndex]!);
+            // Revoke old URL to free memory, but ONLY if it's not the one currently visible
+            // (Actually, we are replacing the slot 'nextIndex', so whatever was there is gone now)
+            if (newTracks[nextIndex]) {
+                URL.revokeObjectURL(newTracks[nextIndex]!);
+            }
             newTracks[nextIndex] = newUrl;
             return newTracks;
         });
 
         // The actual switch of "activeTrackIndex" happens once the new video emits 'canplay'
-        // This is handled in the onCanPlay handler of the video element
-        
     } else {
-        // If blob is null, we might want to fade to black or matrix
-        // For now, we just let the last frame linger or fade out
+        // If blob is null, we do NOT clear the current video immediately to avoid a black flash.
+        // We just let the current video persist or we could fade it out if we wanted "no video" state.
+        // For this app, preserving the last vibe is better than a black screen.
     }
-  }, [videoBlob]); // Intentionally not including activeTrackIndex to avoid loops
+  }, [videoBlob, activeTrackIndex]);
 
   const handleCanPlay = (index: number) => {
-      // Only trigger swap if this is the pending track
+      // Only trigger swap if this is the pending track (the one we just loaded)
       const pendingIndex = activeTrackIndex === 0 ? 1 : 0;
+      
       if (index === pendingIndex) {
           const videoEl = videoRefs.current[index];
           if (videoEl) {
-              videoEl.play().catch(e => console.log("Auto-play blocked", e));
-              setActiveTrackIndex(pendingIndex); // Trigger the CSS Fade
-              setTimeout(() => setFading(false), 1000); // Reset fading state after transition
+              // Try to play
+              const playPromise = videoEl.play();
+              if (playPromise !== undefined) {
+                  playPromise
+                    .then(() => {
+                        // Once playing, switch focus to this track
+                        setActiveTrackIndex(pendingIndex); 
+                    })
+                    .catch(e => console.log("Auto-play blocked or interrupted", e));
+              }
           }
       }
   };
@@ -69,6 +82,7 @@ export const CinematicBackground: React.FC<CinematicBackgroundProps> = ({ videoB
             <video
                 ref={el => { videoRefs.current[0] = el; }}
                 src={tracks[0]}
+                preload="auto"
                 autoPlay
                 loop
                 muted
@@ -84,6 +98,7 @@ export const CinematicBackground: React.FC<CinematicBackgroundProps> = ({ videoB
             <video
                 ref={el => { videoRefs.current[1] = el; }}
                 src={tracks[1]}
+                preload="auto"
                 autoPlay
                 loop
                 muted
