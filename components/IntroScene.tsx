@@ -1,5 +1,5 @@
 import React from 'react';
-import { Atom, Box, BrainCircuit, Cpu, ArrowRight, Zap, Layers, Activity, Aperture } from 'lucide-react';
+import { Atom, Box, BrainCircuit, Cpu, Zap, Aperture } from 'lucide-react';
 import { LessonSubsection } from '../types';
 
 interface IntroSceneProps {
@@ -164,18 +164,6 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ progress, subsections })
                         <div className="h-full bg-emerald-500 w-1/3 animate-pulse mx-auto shadow-[0_0_15px_#10b981]"></div>
                     </div>
                 </div>
-            </div>
-
-             {/* COMPLETION / NEXT PROMPT */}
-             <div 
-                className="absolute bottom-10 right-10 transition-all duration-500 flex items-center gap-4 text-cyan-400 font-mono tracking-widest uppercase bg-black/80 px-6 py-3 rounded-full border border-cyan-500/30"
-                style={{ 
-                    opacity: progress > 95 ? 1 : 0, 
-                    transform: progress > 95 ? 'translateY(0)' : 'translateY(20px)' 
-                }}
-            >
-                <span className="animate-pulse">Awaiting Input</span>
-                <ArrowRight size={20} className="text-white" />
             </div>
             
             {/* Persistent Lesson Indicator */}
