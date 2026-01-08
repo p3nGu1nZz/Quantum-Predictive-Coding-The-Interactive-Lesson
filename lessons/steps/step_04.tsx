@@ -36,7 +36,7 @@ export const Step04: LessonStep = {
             <p>The channel falls silent. In this framework, silence is the sound of understanding.</p>
         </div>}
     ],
-    config: p({ phaseEnabled: true }), setup: 'interference_grid', symbols: [],
+    config: p({ phaseEnabled: true, k: 0.05, r0: 130, sigma: 250 }), setup: 'interference_grid', symbols: [],
     script: [ 
         { at: 1, type: 'pulse', targetId: 'all', label: "Activation" }, 
         { at: 20, type: 'highlight', targetId: 'all', label: "Wavefront" },

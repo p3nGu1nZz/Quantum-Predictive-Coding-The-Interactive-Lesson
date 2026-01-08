@@ -22,7 +22,7 @@ export const Step00_Intro: LessonStep = {
              <p>Finally, we witness how synchronization, reciprocity, and self-organization give rise to a cohesive, intelligent agent.</p>
         </div>}
     ],
-    config: p({ k: 0.05, couplingEnabled: true }), 
+    config: p({ k: 0.02, r0: 250, sigma: 500, couplingEnabled: true }), 
     setup: 'mean_field', 
     symbols: [],
     script: [ 

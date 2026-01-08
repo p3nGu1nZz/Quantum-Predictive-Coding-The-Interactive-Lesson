@@ -15,7 +15,7 @@ export const createParticles = (type: string): Particle[] => {
     switch (type) {
         case 'grid': {
             const particles: Particle[] = [];
-            const rows = 4; const cols = 5; const spacing = 140; 
+            const rows = 4; const cols = 5; const spacing = 160; 
             let id = 0;
             for(let r=0; r<rows; r++) {
                 for(let c=0; c<cols; c++) {
@@ -29,10 +29,10 @@ export const createParticles = (type: string): Particle[] => {
         case 'mean_field': {
             const particles: Particle[] = [];
             for(let i=0; i<25; i++) {
-                particles.push(mkP(i, cx + (Math.random()-0.5)*600, cy + (Math.random()-0.5)*500, COLORS.blue, Math.random(), 0.5, false));
+                particles.push(mkP(i, cx + (Math.random()-0.5)*700, cy + (Math.random()-0.5)*550, COLORS.blue, Math.random(), 0.5, false));
             }
-            particles.push(mkP(30, 80, 80, COLORS.red, 1, 0.5, false));
-            particles.push(mkP(31, CANVAS_WIDTH-80, 80, COLORS.red, 1, 0.5, false));
+            particles.push(mkP(30, 60, 60, COLORS.red, 1, 0.5, false));
+            particles.push(mkP(31, CANVAS_WIDTH-60, 60, COLORS.red, 1, 0.5, false));
             return particles;
         }
         case 'quantum_potential': {
@@ -78,7 +78,7 @@ export const createParticles = (type: string): Particle[] => {
         case 'error_landscape': {
             const particles: Particle[] = [];
             for(let i=0; i<25; i++) {
-                particles.push(mkP(i, cx + (Math.random()-0.5)*600, 100 + Math.random()*150, COLORS.red, 1, 0.5, false));
+                particles.push(mkP(i, cx + (Math.random()-0.5)*750, 80 + Math.random()*180, COLORS.red, 1, 0.5, false));
             }
             return particles;
         }
@@ -87,7 +87,7 @@ export const createParticles = (type: string): Particle[] => {
         }
         case 'interference_grid': {
             const particles: Particle[] = [];
-            const rows = 5; const cols = 8; const spacing = 90;
+            const rows = 5; const cols = 8; const spacing = 110;
             let id = 0;
             for(let r=0; r<rows; r++) {
                 for(let c=0; c<cols; c++) {

@@ -24,7 +24,7 @@ export const Step01: LessonStep = {
             <p>This formulation allows us to treat intelligence as a fluid dynamic process, where "learning" is indistinguishable from physical motion in a continuous symmetry group.</p>
         </div>}
     ],
-    config: p({ couplingEnabled: true, k: 0.05 }), setup: 'grid', symbols: [],
+    config: p({ couplingEnabled: true, k: 0.04, r0: 180, sigma: 350 }), setup: 'grid', symbols: [],
     script: [ 
         // Start with panel in standard position
         { at: 0, type: 'panel', panel: { x: 5, y: 15, w: '30vw', opacity: 1, scale: 1 } },

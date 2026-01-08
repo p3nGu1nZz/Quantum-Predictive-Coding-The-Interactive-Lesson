@@ -24,7 +24,7 @@ export const Step02: LessonStep = {
           <p>By minimizing <InlineMath math="F" />, the system simultaneously solves the inference problem (finding the truth) and the structural problem (maintaining integrity).</p>
       </div>}
     ],
-    config: p({ k: 0.02, damping: 0.95 }), setup: 'error_landscape', symbols: [{symbol:"F", definition:"Free Energy", context:"Surprise"}],
+    config: p({ k: 0.03, damping: 0.90, r0: 160 }), setup: 'error_landscape', symbols: [{symbol:"F", definition:"Free Energy", context:"Surprise"}],
     script: [ 
         { at: 1, type: 'reset' }, 
         { at: 10, type: 'shake', targetId: 'all', duration: 15, label: "Entropy" }, 
